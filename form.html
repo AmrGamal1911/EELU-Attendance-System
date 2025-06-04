@@ -25,171 +25,251 @@
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
 
-        // Get session ID from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionId = urlParams.get('session');
-
-        if (!sessionId) {
-            showError('Invalid session link');
-        } else {
-            // Fetch session data
-            const sessionRef = ref(database, `sessions/${sessionId}`);
-            get(sessionRef).then((snapshot) => {
-                if (snapshot.exists()) {
-                    const session = snapshot.val();
-                    document.getElementById('subjectName').textContent = session.subject;
-                    document.getElementById('weekNumber').textContent = session.week;
-                    
-                    // Check if location verification is required
-                    if (session.location) {
-                        document.getElementById('locationVerification').style.display = 'block';
-                        getStudentLocation(session.location);
-                    }
-                } else {
-                    showError('Session not found');
-                }
-            }).catch((error) => {
-                showError('Error loading session data');
-                console.error(error);
-            });
-        }
-
-        // Calculate distance between two points using Haversine formula
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // Earth's radius in meters
-            const φ1 = lat1 * Math.PI/180;
-            const φ2 = lat2 * Math.PI/180;
-            const Δφ = (lat2-lat1) * Math.PI/180;
-            const Δλ = (lon2-lon1) * Math.PI/180;
-
-            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                    Math.cos(φ1) * Math.cos(φ2) *
-                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-            return R * c; // Distance in meters
-        }
-
-        // Get student's location
-        function getStudentLocation(taLocation) {
-            if (!navigator.geolocation) {
-                showError('Geolocation is not supported by your browser');
-                return;
+        class AttendanceForm {
+            constructor() {
+                this.sessionId = new URLSearchParams(window.location.search).get('session');
+                this.sessionData = null;
+                this.studentLocation = null;
+                this.locationAttempts = 0;
+                this.maxLocationAttempts = 3;
+                this.initializeForm();
             }
 
-            document.getElementById('locationSpinner').style.display = 'block';
-            document.getElementById('locationStatus').textContent = 'Getting your location...';
+            async initializeForm() {
+                console.log('Initializing form...');
+                if (!this.sessionId) {
+                    this.showNoSession();
+                    return;
+                }
 
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
-                    const distance = calculateDistance(
-                        latitude,
-                        longitude,
-                        taLocation.lat,
-                        taLocation.lng
+                try {
+                    await this.fetchSessionData();
+                    this.setupFormListeners();
+                    this.updateUI();
+                    
+                    // Start location check if required
+                    if (this.sessionData.useLocation) {
+                        this.startLocationCheck();
+                    }
+                } catch (error) {
+                    console.error('Error initializing form:', error);
+                    this.showMessage(error.message, 'danger');
+                }
+            }
+
+            async fetchSessionData() {
+                console.log('Fetching session data...');
+                const sessionRef = ref(database, `sessions/${this.sessionId}`);
+                const snapshot = await get(sessionRef);
+                
+                if (!snapshot.exists()) {
+                    throw new Error('Session not found');
+                }
+
+                this.sessionData = snapshot.val();
+                
+                // Check if session is active
+                if (!this.sessionData.active) {
+                    throw new Error('This session is no longer active');
+                }
+
+                // Check if session is full
+                const attendeeCount = Object.keys(this.sessionData.attendees || {}).length;
+                if (attendeeCount >= this.sessionData.maxAttendees) {
+                    throw new Error('Session is full');
+                }
+            }
+
+            setupFormListeners() {
+                console.log('Setting up form listeners...');
+                const form = document.getElementById('attendanceForm');
+                form.addEventListener('submit', (e) => this.handleSubmit(e));
+            }
+
+            updateUI() {
+                console.log('Updating UI...');
+                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('activeSession').classList.remove('hidden');
+                
+                // Update session info
+                document.getElementById('displaySubject').textContent = this.sessionData.subject;
+                document.getElementById('displayWeek').textContent = this.sessionData.week;
+                document.getElementById('attendedCount').textContent = 
+                    Object.keys(this.sessionData.attendees || {}).length;
+                document.getElementById('maxAttendees').textContent = this.sessionData.maxAttendees;
+
+                // Show location verification if required
+                if (this.sessionData.useLocation) {
+                    document.getElementById('locationVerification').classList.remove('hidden');
+                }
+
+                // Show connection status
+                this.updateConnectionStatus('connected');
+            }
+
+            updateConnectionStatus(status) {
+                const indicator = document.getElementById('connectionIndicator');
+                const statusText = document.getElementById('connectionStatus');
+                
+                indicator.className = 'status-indicator';
+                switch (status) {
+                    case 'connected':
+                        indicator.classList.add('connected');
+                        statusText.textContent = 'Connected to session';
+                        break;
+                    case 'connecting':
+                        indicator.classList.add('connecting');
+                        statusText.textContent = 'Connecting...';
+                        break;
+                    case 'offline':
+                        statusText.textContent = 'Disconnected';
+                        break;
+                }
+            }
+
+            async startLocationCheck() {
+                if (!navigator.geolocation) {
+                    this.showMessage('Location verification is required but your browser does not support geolocation', 'danger');
+                    return;
+                }
+
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                };
+
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+                    });
+
+                    this.studentLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+
+                    // Verify distance
+                    const distance = this.calculateDistance(
+                        position.coords.latitude,
+                        position.coords.longitude,
+                        this.sessionData.classLocation.lat,
+                        this.sessionData.classLocation.lng
                     );
 
-                    // Allow 50m radius + accuracy buffer
-                    const maxDistance = 50 + (position.coords.accuracy || 0);
-                    
+                    const maxDistance = this.sessionData.locationDistance + position.coords.accuracy;
                     if (distance <= maxDistance) {
                         document.getElementById('locationStatus').innerHTML = 
                             '<i class="fas fa-check-circle"></i> Location verified';
                         document.getElementById('locationStatus').className = 'text-success';
                         document.getElementById('submitBtn').disabled = false;
                     } else {
-                        showError(`You are too far from the class location (${Math.round(distance)}m away)`);
+                        this.showMessage(`You are too far from the class location (${Math.round(distance)}m away)`, 'danger');
+                        if (this.locationAttempts < this.maxLocationAttempts) {
+                            this.locationAttempts++;
+                            setTimeout(() => this.startLocationCheck(), 5000);
+                        }
                     }
-                    document.getElementById('locationSpinner').style.display = 'none';
-                },
-                (error) => {
-                    let message = 'Error getting location: ';
-                    switch (error.code) {
-                        case error.PERMISSION_DENIED:
-                            message += 'Permission denied';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            message += 'Position unavailable';
-                            break;
-                        case error.TIMEOUT:
-                            message += 'Request timed out';
-                            break;
-                        default:
-                            message += 'Unknown error';
+                } catch (error) {
+                    console.error('Location error:', error);
+                    this.showMessage('Error getting location. Please enable location services.', 'danger');
+                    if (this.locationAttempts < this.maxLocationAttempts) {
+                        this.locationAttempts++;
+                        setTimeout(() => this.startLocationCheck(), 5000);
                     }
-                    showError(message);
-                    document.getElementById('locationSpinner').style.display = 'none';
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
                 }
-            );
-        }
-
-        // Handle form submission
-        document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const studentId = document.getElementById('studentId').value;
-            const sessionRef = ref(database, `sessions/${sessionId}`);
-            
-            try {
-                const snapshot = await get(sessionRef);
-                const session = snapshot.val();
-                
-                // Validate student ID against roster
-                const student = session.roster.find(s => s.id === studentId);
-                if (!student) {
-                    showError('Invalid student ID');
-                    return;
-                }
-                
-                // Check if student already attended
-                if (session.attendees && session.attendees[studentId]) {
-                    showError('You have already submitted attendance for this session');
-                    return;
-                }
-                
-                // Check max attendees limit
-                const attendeeCount = session.attendees ? Object.keys(session.attendees).length : 0;
-                if (attendeeCount >= session.maxAttendees) {
-                    showError('Session is full');
-                    return;
-                }
-                
-                // Record attendance
-                await set(ref(database, `sessions/${sessionId}/attendees/${studentId}`), {
-                    name: student.name,
-                    section: student.section,
-                    timestamp: new Date().toISOString(),
-                    ip: await fetch('https://api.ipify.org?format=json')
-                        .then(response => response.json())
-                        .then(data => data.ip)
-                });
-                
-                // Show success message
-                document.getElementById('successMessage').style.display = 'block';
-                document.getElementById('attendanceForm').style.display = 'none';
-                
-            } catch (error) {
-                showError('Error submitting attendance');
-                console.error(error);
             }
-        });
 
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            document.getElementById('submitBtn').disabled = true;
+            calculateDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371e3; // Earth's radius in meters
+                const φ1 = lat1 * Math.PI/180;
+                const φ2 = lat2 * Math.PI/180;
+                const Δφ = (lat2-lat1) * Math.PI/180;
+                const Δλ = (lon2-lon1) * Math.PI/180;
+
+                const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                        Math.cos(φ1) * Math.cos(φ2) *
+                        Math.sin(Δλ/2) * Math.sin(Δλ/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+                return R * c; // Distance in meters
+            }
+
+            async handleSubmit(event) {
+                event.preventDefault();
+                const form = event.target;
+                const studentId = form.student_id.value.trim();
+
+                try {
+                    // Validate student ID
+                    const student = this.sessionData.roster.find(s => s.id === studentId);
+                    if (!student) {
+                        throw new Error('Invalid student ID');
+                    }
+
+                    // Check for duplicate submission
+                    if (this.sessionData.attendees && 
+                        Object.values(this.sessionData.attendees).some(a => a.id === studentId)) {
+                        throw new Error('You have already submitted attendance for this session');
+                    }
+
+                    // Validate location if required
+                    if (this.sessionData.useLocation && !this.studentLocation) {
+                        throw new Error('Location verification is required');
+                    }
+
+                    // Submit attendance
+                    const attendanceRef = ref(database, `sessions/${this.sessionId}/attendees/${studentId}`);
+                    await set(attendanceRef, {
+                        id: student.id,
+                        name: student.name,
+                        section: student.section,
+                        timestamp: new Date().toISOString(),
+                        ip: await this.getClientIP(),
+                        location: this.studentLocation
+                    });
+
+                    this.showMessage('✅ Attendance submitted successfully!', 'success');
+                    form.reset();
+                    document.getElementById('submitBtn').disabled = true;
+
+        } catch (error) {
+                    this.showMessage(error.message, 'danger');
+                }
+            }
+
+            async getClientIP() {
+                try {
+                    const response = await fetch('https://api.ipify.org?format=json');
+                    const data = await response.json();
+                    return data.ip;
+                } catch (error) {
+                    console.error('Error getting IP:', error);
+                    return 'unknown';
+                }
+            }
+
+            showMessage(message, type) {
+                const messageEl = document.getElementById('message');
+                messageEl.textContent = message;
+                messageEl.className = `alert alert-${type}`;
+                messageEl.classList.remove('hidden');
+            }
+
+            showNoSession() {
+                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('activeSession').classList.add('hidden');
+                document.getElementById('noSession').classList.remove('hidden');
+                this.updateConnectionStatus('offline');
+            }
         }
 
-        // Make functions available globally
-        window.showError = showError;
-        window.getStudentLocation = getStudentLocation;
+        // Initialize the form when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, initializing form...');
+            new AttendanceForm();
+        });
     </script>
     
     <style>
@@ -198,11 +278,9 @@
             --primary-dark: #5a6fd8;
             --secondary: #764ba2;
             --success: #10b981;
-            --warning: #f59e0b;
             --danger: #ef4444;
-            --info: #3b82f6;
+            --light-bg: #f8fafc;
             --dark: #1f2937;
-            --light: #f8fafc;
             --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --border-radius: 12px;
@@ -216,7 +294,8 @@
         
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--light);
+            background: var(--light-bg);
+            color: var(--dark);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -237,6 +316,7 @@
             padding: 2rem;
             box-shadow: var(--shadow);
             border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
         }
@@ -260,6 +340,41 @@
             align-items: center;
             justify-content: center;
             gap: 0.75rem;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            background: rgba(102, 126, 234, 0.1);
+            padding: 0.75rem;
+            border-radius: 50px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #d1d5db;
+            transition: all 0.3s ease;
+        }
+        
+        .status-indicator.connected {
+            background: var(--success);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+        }
+        
+        .status-indicator.connecting {
+            background: #f59e0b;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
         }
         
         .session-info {
@@ -339,6 +454,48 @@
             background: #d1d5db;
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
+        }
+        
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
+            font-weight: 500;
+            animation: slideInDown 0.5s ease-out;
+            border-left: 4px solid;
+        }
+        
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: #047857;
+            border-left-color: var(--success);
+        }
+        
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #b91c1c;
+            border-left-color: var(--danger);
+        }
+        
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #1d4ed8;
+            border-left-color: #3b82f6;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideInDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .text-success {
@@ -348,100 +505,69 @@
         .text-danger {
             color: var(--danger);
         }
-        
-        .spinner {
-            border: 3px solid rgba(102, 126, 234, 0.2);
-            border-top: 3px solid var(--primary);
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 0.5rem;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        #error {
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--danger);
-            padding: 1rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 1rem;
-            display: none;
-            animation: fadeIn 0.3s ease-out;
-        }
-        
-        #successMessage {
-            text-align: center;
-            display: none;
-            animation: fadeIn 0.3s ease-out;
-        }
-        
-        #successMessage i {
-            font-size: 4rem;
-            color: var(--success);
-            margin-bottom: 1rem;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card">
-            <h1><i class="fas fa-user-check"></i> Student Attendance</h1>
-            
-            <div class="session-info">
-                <p>
-                    <span><i class="fas fa-book"></i> Subject:</span>
-                    <strong id="subjectName">Loading...</strong>
-                </p>
-                <p>
-                    <span><i class="fas fa-calendar-week"></i> Week:</span>
-                    <strong id="weekNumber">Loading...</strong>
-                </p>
+            <div id="loadingSection">
+                <h1><i class="fas fa-spinner fa-spin"></i> Loading Session</h1>
+                <p class="text-center">Please wait while we connect to the session...</p>
             </div>
             
-            <div id="error" style="display: none;"></div>
-            
-            <form id="attendanceForm">
-                <div class="form-group">
-                    <label>
-                        <i class="fas fa-id-card"></i> Student ID
-                    </label>
-                    <input type="text" id="studentId" required pattern="[0-9]+" 
-                           title="Please enter your numeric student ID">
+            <div id="activeSession" class="hidden">
+                <h1><i class="fas fa-qrcode"></i> Attendance Form</h1>
+                
+                <div class="connection-status">
+                    <span id="connectionIndicator" class="status-indicator connecting"></span>
+                    <span id="connectionStatus">Connecting...</span>
                 </div>
                 
-                <div id="locationVerification" style="display: none;">
+                <div id="message" class="alert hidden"></div>
+                
+                <div class="session-info">
+                    <p>
+                        <span><i class="fas fa-book"></i> Subject:</span>
+                        <strong id="displaySubject">Loading...</strong>
+                    </p>
+                    <p>
+                        <span><i class="fas fa-calendar-week"></i> Week:</span>
+                        <strong id="displayWeek">Loading...</strong>
+                    </p>
+                    <p>
+                        <span><i class="fas fa-users"></i> Attendance:</span>
+                        <strong><span id="attendedCount">0</span>/<span id="maxAttendees">-</span></strong>
+                    </p>
+                </div>
+                
+                <form id="attendanceForm">
                     <div class="form-group">
+                        <label for="student_id">
+                            <i class="fas fa-id-card"></i> Student ID
+                        </label>
+                        <input type="text" id="student_id" name="student_id" 
+                               placeholder="Enter your university ID" required 
+                               pattern="[0-9]+" title="Please enter your numeric student ID">
+                    </div>
+                    
+                    <div id="locationVerification" class="form-group hidden">
                         <label>
                             <i class="fas fa-map-marker-alt"></i> Location Status
                         </label>
-                        <div>
-                            <span id="locationSpinner" class="spinner"></span>
-                            <span id="locationStatus">Waiting for verification...</span>
+                        <div id="locationStatus" class="text-danger">
+                            Waiting for location verification...
                         </div>
                     </div>
-                    </div>
                     
-                <button type="submit" id="submitBtn" class="btn" disabled>
+                    <button type="submit" id="submitBtn" class="btn" disabled>
                         <i class="fas fa-check-circle"></i> Submit Attendance
                     </button>
                 </form>
+            </div>
             
-            <div id="successMessage">
-                <i class="fas fa-check-circle"></i>
-                <h2>Attendance Recorded!</h2>
-                <p>Your attendance has been successfully recorded.</p>
+            <div id="noSession" class="hidden">
+                <h1><i class="fas fa-exclamation-triangle"></i> No Session Found</h1>
+                <p class="text-center">The attendance session could not be found.<br>Please check the link or contact your instructor.</p>
             </div>
         </div>
     </div>
