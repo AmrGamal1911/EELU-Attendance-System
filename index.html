@@ -1005,7 +1005,7 @@
                     <label for="locationName">Location Name:</label>
                     <input type="text" id="locationName" placeholder="e.g., Room 101" required>
             </div>
-                <button onclick="saveLocation()" class="btn btn-success">
+                <button onclick="attendanceApp.saveLocation()" class="btn btn-success">
                     <i class="fas fa-save"></i> Save Location
                 </button>
             </div>
@@ -2475,8 +2475,31 @@
                 document.getElementById('locationPreview').textContent = 
                     `Location: ${locationName} (${this.classLocation.lat.toFixed(6)}, ${this.classLocation.lng.toFixed(6)})`;
                 
-                // Close modal
-                this.closeLocationModal();
+                // Update location dropdown
+                const locationSelect = document.createElement('select');
+                locationSelect.id = 'locationSelect';
+                locationSelect.className = 'form-control';
+                
+                Object.keys(savedLocations).forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    if (name === locationName) {
+                        option.selected = true;
+                    }
+                    locationSelect.appendChild(option);
+                });
+                
+                const container = document.getElementById('locationSettings');
+                const existingSelect = document.getElementById('locationSelect');
+                if (existingSelect) {
+                    container.replaceChild(locationSelect, existingSelect);
+                } else {
+                    container.insertBefore(locationSelect, container.firstChild);
+                }
+                
+                // Close modal properly
+                document.getElementById('locationQRModal').classList.add('hidden');
                 
                 // Show success message
                 this.showMessage('Location saved successfully!', 'success');
