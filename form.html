@@ -415,21 +415,21 @@
                     this.sessionData = snapshot.val();
                     
                     if (!this.sessionData) {
-                        this.showNoSession();
-                        return;
-                    }
+                            this.showNoSession();
+                            return;
+                        }
 
                     if (!this.sessionData.active) {
-                        this.showClosedSession();
-                        return;
-                    }
+                            this.showClosedSession();
+                            return;
+                        }
 
                     // Get current IP
                     try {
                         const ipResponse = await fetch('https://api.ipify.org?format=json');
                         const ipData = await ipResponse.json();
                         this.currentIP = ipData.ip;
-                    } catch (error) {
+                } catch (error) {
                         console.warn('Could not get IP:', error);
                         this.currentIP = 'unknown';
                     }
@@ -463,8 +463,8 @@
                     document.getElementById('activeSession').classList.remove('hidden');
                     
                     // Update connection status
-                    this.updateConnectionStatus('connected');
-                    
+                        this.updateConnectionStatus('connected');
+                        
                 } catch (error) {
                     console.error('Session initialization error:', error);
                     this.handleInitializationError(error);
@@ -539,8 +539,8 @@
                     const attendeeList = Object.values(attendees);
                     console.log('Received attendees update:', attendeeList.length, 'attendees');
                     
-                    this.sessionData.attendees = attendeeList;
-                    this.updateAttendanceCount();
+                        this.sessionData.attendees = attendeeList;
+                        this.updateAttendanceCount();
                     
                     // Check if session is full
                     if (attendeeList.length >= this.sessionData.maxAttendees) {
@@ -632,7 +632,7 @@
                     const password = document.getElementById('password').value;
 
                     // Validate password if required
-                    if (this.sessionData.password && password !== this.sessionData.password) {
+                if (this.sessionData.password && password !== this.sessionData.password) {
                         throw new Error('Incorrect session password');
                     }
 
@@ -731,6 +731,21 @@
                         });
                         return;
                     }
+
+                    // Check if current IP matches TA's IP
+                    if (this.currentIP === this.sessionData.taIP) {
+                        resolve({
+                            success: true,
+                            message: 'Location verified (TA device)',
+                            locationData: {
+                                coordinates: this.sessionData.classLocation,
+                                accuracy: 0,
+                                timestamp: new Date().toISOString(),
+                                distance: 0
+                            }
+                        });
+                        return;
+                    }
                     
                     if (!navigator.geolocation) {
                         resolve({ 
@@ -793,7 +808,6 @@
                                     locationData: locationData
                                 });
                             } else {
-                                const extraDistance = Math.round(distance - totalAllowedDistance);
                                 resolve({ 
                                     success: false,
                                     message: `You are ${Math.round(distance)}m from the class location. Maximum allowed distance is ${maxDistance}m (plus ${accuracyBuffer}m accuracy buffer).`,
@@ -1004,9 +1018,9 @@
                 
                 if (!session) {
                     this.showMessage('Session not found or already ended', 'danger');
-                    return;
-                }
-                
+                        return;
+                    }
+                    
                 const roster = session.roster || [];
                 const attendees = session.attendees || [];
                 const currentWeek = parseInt(session.week);
@@ -1050,7 +1064,7 @@
             watchLocation: function() {
                 if (!navigator.geolocation) {
                     this.showMessage('Geolocation is not supported by your browser.', 'danger');
-                    return;
+                            return;
                 }
                 
                 const options = {
