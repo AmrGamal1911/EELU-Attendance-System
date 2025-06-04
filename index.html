@@ -1227,109 +1227,99 @@
             initializeApp: function() {
                 const rosterInput = document.getElementById('roster');
                 const fileNameSpan = document.getElementById('fileName');
-                const uploadForm = document.getElementById('uploadForm');
                 const rosterInfoDiv = document.getElementById('rosterInfo');
                 const studentCountSpan = document.getElementById('studentCount');
                 const weekCountSpan = document.getElementById('weekCount');
                 const sessionForm = document.getElementById('sessionForm');
                 const createSessionBtn = document.getElementById('createSessionBtn');
                 
-                rosterInput.addEventListener('change', function(e) {
+                // Process roster file when selected
+                rosterInput.addEventListener('change', async (e) => {
                     if (this.files.length > 0) {
                         const file = this.files[0];
                         fileNameSpan.textContent = file.name;
                         
                         const subjectFromFile = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
                         document.getElementById('subjectNameInput').value = subjectFromFile;
+                        
+                        // Automatically process the file
+                        const reader = new FileReader();
+                        
+                        reader.onload = (e) => {
+                            try {
+                                const data = new Uint8Array(e.target.result);
+                                const workbook = XLSX.read(data, { type: 'array' });
+                                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                                
+                                const weekColumns = {};
+                                let maxWeek = 0;
+                                
+                                if (jsonData.length > 0) {
+                                    Object.keys(jsonData[0]).forEach(key => {
+                                        const lowerKey = key.toLowerCase();
+                                        if (lowerKey.includes('timestamp')) return;
+
+                                        const match = key.match(/week[\s_]?(\d+)/i);
+                                        if (match) {
+                                            const weekNum = parseInt(match[1]);
+                                            if (!isNaN(weekNum)) {
+                                                weekColumns[weekNum] = key;
+                                                if (weekNum > maxWeek) maxWeek = weekNum;
+                                            }
+                                        }
+                                    });
+                                }
+                                
+                                attendanceApp.rosterData = jsonData.map(row => {
+                                    const id = String(row['Student ID'] || row['ID'] || row['id'] || row['StudentID'] || row['student_id'] || '').trim();
+                                    const name = (row['Name'] || row['Student Name'] || row['name'] || row['StudentName'] || row['student_name'] || '').trim();
+                                    const section = (row['Section'] || row['Class'] || row['section'] || row['class'] || '').trim();
+                                    
+                                    const weekData = {};
+                                    Object.keys(weekColumns).forEach(weekNum => {
+                                        const rawValue = row[weekColumns[weekNum]];
+                                        const cleaned = String(rawValue || '').trim().toLowerCase();
+                                        const presentValues = ['1', 'yes', '✓', 'present', 'x'];
+                                        weekData[weekNum] = presentValues.includes(cleaned) ? 1 : 0;
+                                        if (rawValue && typeof rawValue === 'string' && (rawValue.includes('/') || rawValue.includes(':'))) {
+                                            row[`Timestamp Week ${weekNum}`] = rawValue;
+                                        }
+                                    });
+                                    
+                                    return { id, name, section, weekData, ...row };
+                                }).filter(student => student.id && student.name);
+                                
+                                if (attendanceApp.rosterData.length === 0) {
+                                    attendanceApp.showMessage('No valid student data found. Please check your file format.', 'danger');
+                                    return;
+                                }
+                                
+                                attendanceApp.subjectName = document.getElementById('subjectNameInput').value;
+                                attendanceApp.existingWeeks = Object.keys(weekColumns).map(Number).sort((a, b) => a - b);
+                                attendanceApp.maxExistingWeek = maxWeek;
+                                
+                                studentCountSpan.textContent = attendanceApp.rosterData.length;
+                                weekCountSpan.textContent = attendanceApp.existingWeeks.length > 0 ? 
+                                    attendanceApp.existingWeeks.join(', ') : 'None (New Session)';
+                                rosterInfoDiv.classList.remove('hidden');
+                                createSessionBtn.disabled = false;
+                                
+                                attendanceApp.showMessage('Roster uploaded successfully!', 'success');
+                            } catch (error) {
+                                console.error(error);
+                                attendanceApp.showMessage('Error processing file. Please check the format.', 'danger');
+                            }
+                        };
+                        
+                        reader.onerror = () => {
+                            attendanceApp.showMessage('Error reading file', 'danger');
+                        };
+                        
+                        reader.readAsArrayBuffer(file);
                     } else {
                         fileNameSpan.textContent = 'No file chosen';
                     }
-                });
-                
-                uploadForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    if (rosterInput.files.length === 0) {
-                        attendanceApp.showMessage('Please select a file first', 'danger');
-                        return;
-                    }
-                    
-                    const file = rosterInput.files[0];
-                    const reader = new FileReader();
-                    
-                    reader.onload = function(e) {
-                        try {
-                            const data = new Uint8Array(e.target.result);
-                            const workbook = XLSX.read(data, { type: 'array' });
-                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                            const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-                            
-                            const weekColumns = {};
-                            let maxWeek = 0;
-                            
-                            if (jsonData.length > 0) {
-                                Object.keys(jsonData[0]).forEach(key => {
-                                    const lowerKey = key.toLowerCase();
-                                    if (lowerKey.includes('timestamp')) return;
-
-                                    const match = key.match(/week[\s_]?(\d+)/i);
-                                    if (match) {
-                                        const weekNum = parseInt(match[1]);
-                                        if (!isNaN(weekNum)) {
-                                            weekColumns[weekNum] = key;
-                                            if (weekNum > maxWeek) maxWeek = weekNum;
-                                        }
-                                    }
-                                });
-                            }
-                            
-                            attendanceApp.rosterData = jsonData.map(row => {
-                                const id = String(row['Student ID'] || row['ID'] || row['id'] || row['StudentID'] || row['student_id'] || '').trim();
-                                const name = (row['Name'] || row['Student Name'] || row['name'] || row['StudentName'] || row['student_name'] || '').trim();
-                                const section = (row['Section'] || row['Class'] || row['section'] || row['class'] || '').trim();
-                                
-                                const weekData = {};
-                                Object.keys(weekColumns).forEach(weekNum => {
-                                    const rawValue = row[weekColumns[weekNum]];
-                                    const cleaned = String(rawValue || '').trim().toLowerCase();
-                                    const presentValues = ['1', 'yes', '✓', 'present', 'x'];
-                                    weekData[weekNum] = presentValues.includes(cleaned) ? 1 : 0;
-                                    if (rawValue && typeof rawValue === 'string' && (rawValue.includes('/') || rawValue.includes(':'))) {
-                                        row[`Timestamp Week ${weekNum}`] = rawValue;
-                                    }
-                                });
-                                
-                                return { id, name, section, weekData, ...row };
-                            }).filter(student => student.id && student.name);
-                            
-                            if (attendanceApp.rosterData.length === 0) {
-                                attendanceApp.showMessage('No valid student data found. Please check your file format.', 'danger');
-                                return;
-                            }
-                            
-                            attendanceApp.subjectName = document.getElementById('subjectNameInput').value || 
-                                             file.name.replace(/\.(xlsx|csv)$/i, '').replace(/_/g, ' ');
-                            
-                            attendanceApp.existingWeeks = Object.keys(weekColumns).map(Number).sort((a, b) => a - b);
-                            attendanceApp.maxExistingWeek = maxWeek;
-                            
-                            studentCountSpan.textContent = attendanceApp.rosterData.length;
-                            weekCountSpan.textContent = attendanceApp.existingWeeks.length > 0 ? 
-                                attendanceApp.existingWeeks.join(', ') : 'None (New Session)';
-                            rosterInfoDiv.classList.remove('hidden');
-                            createSessionBtn.disabled = false;
-                            
-                            attendanceApp.showMessage('Roster uploaded successfully!', 'success');
-                        } catch (error) {
-                            console.error(error);
-                            attendanceApp.showMessage('Error processing file. Please check the format.', 'danger');
-                        }
-                    };
-                    
-                    reader.onerror = function() {
-                        attendanceApp.showMessage('Error reading file', 'danger');
-                    };
-                    
-                    reader.readAsArrayBuffer(file);
                 });
                 
                 sessionForm.addEventListener('submit', async function(e) {
@@ -1346,6 +1336,11 @@
                         return;
                     }
                     
+                    if (useLocation && !attendanceApp.classLocation) {
+                        attendanceApp.showMessage('Please set a location first', 'danger');
+                        return;
+                    }
+                    
                     document.getElementById('sessionsContainer').innerHTML = '';
                     
                     const finalizeSession = async () => {
@@ -1353,7 +1348,10 @@
                             const sessionId = 'session_' + Date.now();
                             
                             // Save TA's IP for blocking
-                            const taIP = await fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => data.ip).catch(() => 'unknown');
+                            const taIP = await fetch('https://api.ipify.org?format=json')
+                                .then(res => res.json())
+                                .then(data => data.ip)
+                                .catch(() => 'unknown');
 
                             // Generate one token per student
                             const tokenList = {};
@@ -1444,22 +1442,7 @@
                         }
                     };
 
-                    if (useLocation && !attendanceApp.classLocation && navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(pos => {
-                            attendanceApp.classLocation = {
-                                lat: pos.coords.latitude,
-                                lng: pos.coords.longitude,
-                                accuracy: pos.coords.accuracy
-                            };
-                            finalizeSession();
-                        }, err => {
-                            console.error('Location error:', err);
-                            attendanceApp.showMessage('Location access denied. Session will start without location verification.', 'warning');
-                            finalizeSession();
-                        }, { enableHighAccuracy: true, timeout: 10000 });
-                    } else {
-                        finalizeSession();
-                    }
+                    finalizeSession();
                 });
             },
 
@@ -2388,11 +2371,13 @@
                 // Verify origin for security
                 if (event.origin !== window.location.origin) return;
                 
-                const { lat, lng, accuracy } = event.data;
+                const { lat, lng, accuracy, name } = event.data;
                 if (lat && lng) {
                     attendanceApp.classLocation = { lat, lng, accuracy };
+                    
+                    // Update location preview
                     document.getElementById('locationPreview').textContent = 
-                        `Location set: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy.toFixed(0)}m)`;
+                        `Location: ${name} (${lat.toFixed(6)}, ${lng.toFixed(6)})`;
                     
                     // Close modal
                     document.getElementById('locationQRModal').classList.add('hidden');
