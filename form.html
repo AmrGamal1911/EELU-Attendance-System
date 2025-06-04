@@ -412,15 +412,15 @@
                     const sessionData = sessionSnapshot.val();
                     
                     if (!sessionData) {
-                        this.showNoSession();
-                        return;
-                    }
-                    
+                            this.showNoSession();
+                            return;
+                        }
+
                     if (!sessionData.active) {
-                        this.showClosedSession();
-                        return;
-                    }
-                    
+                            this.showClosedSession();
+                            return;
+                        }
+
                     this.sessionData = sessionData;
                     
                     // Set up real-time listener for session status
@@ -441,7 +441,7 @@
                         const ipData = await ipResponse.json();
                         this.currentIP = ipData.ip;
                         console.log('Current IP fetched:', this.currentIP);
-                    } catch (error) {
+                } catch (error) {
                         console.warn('Could not get IP:', error);
                         this.currentIP = 'unknown';
                     }
@@ -465,18 +465,18 @@
                     document.getElementById('maxAttendees').textContent = this.sessionData.maxAttendees;
                     
                     // Show password field if required
-                    if (this.sessionData.password) {
-                        document.getElementById('passwordField').classList.remove('hidden');
-                    }
+                        if (this.sessionData.password) {
+                            document.getElementById('passwordField').classList.remove('hidden');
+                        }
 
                     // Show active session UI
                     document.getElementById('loadingSection').classList.add('hidden');
                     document.getElementById('activeSession').classList.remove('hidden');
-                    
+
                     // Update connection status
                     this.updateConnectionStatus('connected');
 
-                } catch (error) {
+                    } catch (error) {
                     console.error('Session initialization error:', error);
                     this.handleInitializationError(error);
                 }
@@ -538,8 +538,8 @@
                         isFull: attendeeList.length >= this.sessionData.maxAttendees
                     });
                     
-                    this.sessionData.attendees = attendeeList;
-                    this.updateAttendanceCount();
+                        this.sessionData.attendees = attendeeList;
+                        this.updateAttendanceCount();
                     
                     // Update attendance display
                     document.getElementById('attendedCount').textContent = attendeeList.length;
@@ -637,80 +637,17 @@
 
             verifyLocation: async function() {
                 return new Promise((resolve) => {
-                    console.log('Starting verification process...');
-                    
-                    if (!this.currentIP) {
-                        console.log('No IP address available');
-                        document.getElementById('submitBtn').disabled = true;
-                        this.updateLocationStatus({
-                            success: false,
-                            message: 'Unable to verify device identity'
-                        });
-                        resolve({ 
-                            success: false, 
-                            message: 'Unable to verify device identity',
-                            locationData: null 
-                        });
-                        return;
-                    }
-
-                    // Step 1: Check if current IP matches TA's IP
-                    if (this.currentIP === this.sessionData.taIP) {
-                        console.log('TA IP match confirmed - enabling submit button');
-                        const submitBtn = document.getElementById('submitBtn');
-                        submitBtn.disabled = false;
-                        
-                        this.updateLocationStatus({
-                            success: true,
-                            message: 'Location verified (TA device)'
-                        });
-                        
-                        resolve({
-                            success: true,
-                            message: 'Location verified (TA device)',
-                            locationData: {
-                                coordinates: this.sessionData.classLocation,
-                                accuracy: 0,
-                                timestamp: new Date().toISOString(),
-                                distance: 0
-                            }
-                        });
-                        return;
-                    }
-
-                    // Step 2: If not TA's IP, verify student location
-                    if (!this.sessionData.classLocation) {
-                        console.log('No class location set');
-                        document.getElementById('submitBtn').disabled = true;
-                        this.updateLocationStatus({
-                            success: false,
-                            message: 'No class location has been set by the instructor'
-                        });
-                        resolve({ 
-                            success: false, 
-                            message: 'No class location has been set by the instructor',
-                            locationData: null 
-                        });
-                        return;
-                    }
-
                     if (!navigator.geolocation) {
-                        console.log('Geolocation not supported');
                         document.getElementById('submitBtn').disabled = true;
-                        this.updateLocationStatus({
-                            success: false,
-                            message: 'Your browser does not support location services'
-                        });
+                        this.showLocationStatus(false, 'Your browser does not support location services');
                         resolve({ 
                             success: false,
-                            message: 'Your browser does not support location services. Please use a modern browser.',
+                            message: 'Your browser does not support location services',
                             locationData: null
                         });
-                        return;
-                    }
+                    return;
+                }
 
-                    this.showMessage('Verifying your location...', 'info');
-                    
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
                             const studentLat = position.coords.latitude;
@@ -723,61 +660,46 @@
                                 classLat, classLng
                             );
 
-                            console.log('Location check - Distance:', Math.round(distance), 'meters');
-
-                            const locationData = {
-                                coordinates: {
-                                    latitude: studentLat,
-                                    longitude: studentLng
-                                },
-                                accuracy: Math.min(position.coords.accuracy, 20),
-                                timestamp: new Date().toISOString(),
-                                distance: Math.round(distance),
-                                classLocation: {
-                                    latitude: classLat,
-                                    longitude: classLng
-                                }
-                            };
-
                             const maxDistance = this.sessionData.locationDistance || 50;
-                            const accuracyBuffer = Math.min(position.coords.accuracy, 20);
-                            const totalAllowedDistance = maxDistance + accuracyBuffer;
+                            const isWithinRange = distance <= maxDistance;
                             
-                            const isWithinRange = distance <= totalAllowedDistance;
+                            // Update submit button state
                             const submitBtn = document.getElementById('submitBtn');
                             submitBtn.disabled = !isWithinRange;
 
-                            const locationStatus = {
+                            // Show location status
+                            this.showLocationStatus(
+                                isWithinRange,
+                                isWithinRange ? 
+                                    `Valid location (${Math.round(distance)}m from room)` :
+                                    `Invalid location (${Math.round(distance)}m from room)`,
+                                distance,
+                                maxDistance
+                            );
+
+                            resolve({
                                 success: isWithinRange,
                                 message: isWithinRange ? 
                                     `Valid location (${Math.round(distance)}m from room)` :
                                     `Invalid location (${Math.round(distance)}m from room)`,
-                                details: !isWithinRange ? {
-                                    distance: Math.round(distance),
-                                    maxAllowed: maxDistance,
-                                    accuracy: Math.round(accuracyBuffer)
-                                } : null
-                            };
-
-                            this.updateLocationStatus(locationStatus);
-
-                            resolve({ 
-                                success: isWithinRange,
-                                message: locationStatus.message,
-                                locationData: locationData
+                                locationData: {
+                                    coordinates: {
+                                        latitude: studentLat,
+                                        longitude: studentLng
+                                    },
+                                    accuracy: position.coords.accuracy,
+                                    timestamp: new Date().toISOString(),
+                                    distance: Math.round(distance)
+                                }
                             });
                         },
                         (error) => {
                             console.error('Location error:', error);
                             document.getElementById('submitBtn').disabled = true;
-                            const errorMessage = this.getLocationErrorMessage(error);
-                            this.updateLocationStatus({
-                                success: false,
-                                message: errorMessage
-                            });
+                            this.showLocationStatus(false, this.getLocationErrorMessage(error));
                             resolve({ 
                                 success: false,
-                                message: errorMessage,
+                                message: this.getLocationErrorMessage(error),
                                 locationData: null
                             });
                         },
@@ -850,9 +772,9 @@
                 if (!this.sessionData.useLocation) {
                     console.log('Location verification not required');
                     document.getElementById('submitBtn').disabled = false;
-                    return;
-                }
-                
+                        return;
+                    }
+                    
                 try {
                     const locationResult = await this.verifyLocation();
                     console.log('Location check result:', locationResult.success ? 'Success' : 'Failed');
@@ -888,38 +810,32 @@
                 return message;
             },
 
-            updateLocationStatus: function(status) {
-                // Remove any existing location status
-                const existingStatus = document.getElementById('locationStatus');
-                if (existingStatus) {
-                    existingStatus.remove();
-                }
+            showLocationStatus: function(isValid, message, distance, maxDistance) {
+                // Remove any existing location status elements
+                const existingStatuses = document.querySelectorAll('[id^="locationStatus"]');
+                existingStatuses.forEach(status => status.remove());
 
                 const locationStatus = document.createElement('div');
                 locationStatus.id = 'locationStatus';
-                locationStatus.className = `alert ${status.success ? 'alert-success' : 'alert-danger'}`;
+                locationStatus.className = `alert ${isValid ? 'alert-success' : 'alert-danger'}`;
                 locationStatus.style.marginBottom = '1rem';
-
-                let statusHtml = `
-                    <i class="fas ${status.success ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i> 
-                    ${status.message}
+                
+                let html = `
+                    <i class="fas ${isValid ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i> 
+                    ${message}
                 `;
 
-                if (status.details) {
-                    statusHtml += `
+                if (typeof distance !== 'undefined' && !isValid) {
+                    html += `
                         <div style="margin-top: 0.5rem; font-size: 0.9em;">
-                            <strong>Details:</strong><br>
-                            - Current distance: ${status.details.distance}m<br>
-                            - Maximum allowed: ${status.details.maxAllowed}m<br>
-                            - Location accuracy: ±${status.details.accuracy}m<br>
-                            <strong class="text-red-500">Please move closer to the room to submit attendance.</strong>
+                            <strong>You must be within ${maxDistance}m of the room to submit attendance.</strong>
                         </div>
                     `;
                 }
 
-                locationStatus.innerHTML = statusHtml;
+                locationStatus.innerHTML = html;
 
-                // Insert the location status before the submit button
+                // Insert before the submit button
                 const form = document.getElementById('attendanceForm');
                 const submitBtn = document.getElementById('submitBtn');
                 form.insertBefore(locationStatus, submitBtn);
@@ -941,7 +857,7 @@
                         this.showClosedSession();
                         return;
                     }
-
+                    
                     const studentId = document.getElementById('student_id').value.trim();
                     const password = document.getElementById('password').value;
 
@@ -962,15 +878,6 @@
                         throw new Error('Attendance already recorded for this ID');
                     }
 
-                    // If location is enabled, verify it first
-                    let locationVerification = null;
-                    if (this.sessionData.useLocation) {
-                        locationVerification = await this.verifyLocation();
-                        if (!locationVerification.success) {
-                            throw new Error(locationVerification.message || 'Location verification failed');
-                        }
-                    }
-
                     // Prepare attendance data
                     const attendanceData = {
                         id: student.id,
@@ -982,7 +889,10 @@
                             ip: this.currentIP,
                             userAgent: navigator.userAgent
                         },
-                        notes: []
+                        notes: [],
+                        weekData: {
+                            [this.sessionData.week]: 1 // Always give attendance value of 1
+                        }
                     };
 
                     // Check for same IP in existing attendees
@@ -993,22 +903,19 @@
                             
                         if (sameIPAttendees.length > 0) {
                             const sameIPInfo = sameIPAttendees.map(a => `${a.id} (${a.name})`).join(', ');
-                            attendanceData.notes.push(`Same IP address with: ${sameIPInfo}`);
-                            
-                            // Add attendance record for the week
-                            const weekNum = parseInt(this.sessionData.week);
-                            if (!isNaN(weekNum)) {
-                                if (!student.weekData) student.weekData = {};
-                                student.weekData[weekNum] = 1;
-                                attendanceData.weekData = student.weekData;
-                            }
+                            attendanceData.notes.push(`Same IP with: ${sameIPInfo}`);
                         }
                     }
 
-                    // Add location data if verified
-                    if (locationVerification?.locationData) {
+                    // If location is enabled, verify it first
+                    if (this.sessionData.useLocation) {
+                        const locationVerification = await this.verifyLocation();
+                        if (!locationVerification.success) {
+                            throw new Error(locationVerification.message || 'Location verification failed');
+                        }
+                        
                         attendanceData.location = {
-                            verified: true,
+                            verified: locationVerification.success,
                             coordinates: locationVerification.locationData.coordinates,
                             accuracy: locationVerification.locationData.accuracy,
                             distance: locationVerification.locationData.distance,
