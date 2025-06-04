@@ -393,6 +393,7 @@
             currentIP: null,
 
             init: async function() {
+                console.log('Initializing form...');
                 const urlParams = new URLSearchParams(window.location.search);
                 const sessionId = urlParams.get('session');
                 
@@ -406,24 +407,33 @@
                 this.updateConnectionStatus('connecting');
                 
                 try {
-                    // Clean up any existing listeners
-                    this.cleanup();
-                    
-                    // Get session data
-                    const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
-                    const snapshot = await window.dbGet(sessionRef);
-                    this.sessionData = snapshot.val();
+                    console.log('Fetching session data...');
+                    const sessionSnapshot = await window.dbGet(window.dbRef(window.database, `sessions/${sessionId}`));
+                    this.sessionData = sessionSnapshot.val();
                     
                     if (!this.sessionData) {
-                            this.showNoSession();
-                            return;
-                        }
-
+                        throw new Error('Session not found');
+                    }
+                    
                     if (!this.sessionData.active) {
-                            this.showClosedSession();
-                            return;
-                        }
-
+                        throw new Error('This session has ended');
+                    }
+                    
+                    console.log('Session data loaded:', {
+                        useLocation: this.sessionData.useLocation,
+                        taIP: this.sessionData.taIP,
+                        currentIP: this.currentIP
+                    });
+                    
+                    // If using location verification
+                    if (this.sessionData.useLocation) {
+                        console.log('Location verification required - starting location check');
+                        await this.startLocationCheck();
+                    } else {
+                        console.log('No location verification required - enabling submit button');
+                        document.getElementById('submitBtn').disabled = false;
+                    }
+                    
                     // Get current IP
                     try {
                         const ipResponse = await fetch('https://api.ipify.org?format=json');
@@ -435,7 +445,7 @@
                     }
 
                     // Set up Firebase references
-                    this.sessionRef = sessionRef;
+                    this.sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
                     this.attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
 
                     // Update session info display
@@ -446,13 +456,6 @@
                     // Show password field if required
                     if (this.sessionData.password) {
                         document.getElementById('passwordField').classList.remove('hidden');
-                    }
-                    
-                    // If using location verification
-                    if (this.sessionData.useLocation) {
-                        await this.startLocationCheck();
-                    } else {
-                        document.getElementById('submitBtn').disabled = false;
                     }
                     
                     // Set up real-time listeners
@@ -496,51 +499,39 @@
             },
 
             setupRealtimeListeners: function() {
-                if (!this.sessionId) return;
+                console.log('Setting up real-time listeners...');
                 
-                // Clean up existing listeners first
-                this.cleanup();
-                
-                // Session listener
-                this.sessionRef = window.dbRef(window.database, `sessions/${this.sessionId}`);
+                // Listen for session updates
                 window.dbOnValue(this.sessionRef, (snapshot) => {
-                    const data = snapshot.val();
-                    if (!data) {
-                        this.showNoSession();
+                    const sessionData = snapshot.val();
+                    console.log('Received session update:', sessionData ? 'active' : 'inactive');
+                    
+                    if (!sessionData || !sessionData.active) {
+                        this.showMessage('This session has ended', 'info');
+                        document.getElementById('submitBtn').disabled = true;
                         return;
                     }
                     
-                    // Check if session state changed
-                    const wasActive = this.sessionData?.active;
-                    this.sessionData = data;
-                    
-                    if (!this.sessionData.active) {
-                        if (wasActive) {
-                            this.showMessage('This session has ended', 'info');
-                        }
-                        this.showClosedSession();
-                        return;
-                    }
-                    
-                    this.updateSessionDisplay();
-                    this.updateConnectionStatus('connected');
+                    this.sessionData = sessionData;
                 }, (error) => {
                     console.error('Session listener error:', error);
-                    this.showMessage('Connection error: ' + error.message, 'danger');
-                    this.updateConnectionStatus('error');
+                    this.showMessage('Error updating session status', 'warning');
                 });
                 
-                // Attendees listener
-                this.attendeesRef = window.dbRef(window.database, `sessions/${this.sessionId}/attendees`);
+                // Listen for attendees updates
                 window.dbOnValue(this.attendeesRef, (snapshot) => {
                     if (!this.sessionData) return;
                     
                     const attendees = snapshot.val() || {};
                     const attendeeList = Object.values(attendees);
-                    console.log('Received attendees update:', attendeeList.length, 'attendees');
+                    console.log('Received attendees update:', {
+                        count: attendeeList.length,
+                        maxAttendees: this.sessionData.maxAttendees,
+                        isFull: attendeeList.length >= this.sessionData.maxAttendees
+                    });
                     
-                        this.sessionData.attendees = attendeeList;
-                        this.updateAttendanceCount();
+                    this.sessionData.attendees = attendeeList;
+                    this.updateAttendanceCount();
                     
                     // Check if session is full
                     if (attendeeList.length >= this.sessionData.maxAttendees) {
@@ -551,6 +542,8 @@
                     console.error('Attendees listener error:', error);
                     this.showMessage('Error updating attendance list', 'warning');
                 });
+                
+                console.log('Real-time listeners setup complete');
             },
 
             handleInitializationError: function(error) {
@@ -732,9 +725,19 @@
                         return;
                     }
 
+                    console.log('Verifying location - Current IP:', this.currentIP, 'TA IP:', this.sessionData.taIP);
+                    
                     // Check if current IP matches TA's IP
                     if (this.currentIP === this.sessionData.taIP) {
-                        document.getElementById('submitBtn').disabled = false; // Explicitly enable for TA
+                        console.log('TA IP match detected - enabling submit button');
+                        const submitBtn = document.getElementById('submitBtn');
+                        submitBtn.disabled = false;
+                        
+                        // Force enable after a small delay to ensure it takes effect
+                        setTimeout(() => {
+                            submitBtn.disabled = false;
+                        }, 100);
+                        
                         resolve({
                             success: true,
                             message: 'Location verified (TA device)',
