@@ -1836,40 +1836,82 @@
                     return;
                 }
                 
-                // Build map of IPs to IDs
-                const ipMap = {};
-                attendees.forEach(a => {
-                    if (!a.deviceInfo?.ip) return;
-                    if (!ipMap[a.deviceInfo.ip]) ipMap[a.deviceInfo.ip] = [];
-                    ipMap[a.deviceInfo.ip].push(a.id);
+                // Group attendees by IP address
+                const ipGroups = {};
+                attendees.forEach(attendee => {
+                    const ip = attendee.deviceInfo?.ip;
+                    if (ip) {
+                        if (!ipGroups[ip]) {
+                            ipGroups[ip] = [];
+                        }
+                        ipGroups[ip].push(attendee);
+                    }
                 });
-                
+
                 const attendeesHtml = attendees
                     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
                     .map(attendee => {
-                        let ipNote = '';
-                        const others = ipMap[attendee.deviceInfo.ip]?.filter(id => id !== attendee.id);
-                        if (others?.length > 0) {
-                            ipNote = `<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Same IP with ${others.join(', ')}</span>`;
+                        let notesHtml = '';
+                        const ip = attendee.deviceInfo?.ip;
+                        
+                        // Check for same IP
+                        if (ip && ipGroups[ip].length > 1) {
+                            const otherStudents = ipGroups[ip]
+                                .filter(a => a.id !== attendee.id)
+                                .map(a => a.id)
+                                .join(', ');
+                            notesHtml = `
+                                <div class="alert alert-warning mt-1" style="display: block; margin: 0.5rem 0;">
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    Same IP address as: ${otherStudents}
+                                </div>
+                            `;
+                        }
+
+                        let locationHtml = '';
+                        if (attendee.location) {
+                            const locationClass = attendee.location.verified ? 'alert-success' : 'alert-danger';
+                            const locationIcon = attendee.location.verified ? 'fa-check-circle' : 'fa-exclamation-triangle';
+                            locationHtml = `
+                                <div class="alert ${locationClass} mt-1" style="display: block; margin: 0.5rem 0;">
+                                    <i class="fas ${locationIcon}"></i> 
+                                    ${attendee.location.verificationMessage}
+                                    ${!attendee.location.verified ? '<br><strong>Student was too far from class location</strong>' : ''}
+                                </div>
+                            `;
                         }
 
                         return `
-                            <div class="attendee-item">
+                            <div class="attendee-item" style="border-bottom: 1px solid #e5e7eb; padding: 1rem 0;">
                                 <div class="attendee-info">
-                                    <span class="attendee-name">${attendee.name}</span>
-                                    <span class="attendee-details">
-                                        ID: ${attendee.id} | Section: ${attendee.section} <br>
-                                        ${ipNote}
-                                    </span>
-                                </div>
-                                <div class="attendee-time">
-                                    ${new Date(attendee.timestamp).toLocaleTimeString()}
+                                    <div style="font-weight: 500; color: #1f2937;">
+                                        ${attendee.name} (${attendee.id})
+                                    </div>
+                                    <div style="color: #6b7280; font-size: 0.875rem;">
+                                        Section: ${attendee.section}
+                                        <br>
+                                        Time: ${new Date(attendee.timestamp).toLocaleTimeString()}
+                                    </div>
+                                    ${notesHtml}
+                                    ${locationHtml}
                                 </div>
                             </div>
                         `;
                     }).join('');
                 
                 attendanceListDiv.innerHTML = attendeesHtml;
+                
+                // Update progress bar and counts
+                const progressFill = document.getElementById(`progressFill_${sessionId}`);
+                const attendedCount = document.getElementById(`attendedCount_${sessionId}`);
+                if (progressFill && attendedCount) {
+                    const percentage = (attendees.length / sessionData.maxAttendees) * 100;
+                    progressFill.style.width = `${percentage}%`;
+                    attendedCount.textContent = attendees.length;
+                }
+                
+                // Update session history if needed
+                this.updateSessionHistory();
             },
 
             exportAttendanceReport: async function(sessionId) {
@@ -2739,6 +2781,38 @@
                     console.error('Error creating session:', error);
                     this.showMessage('Failed to create session: ' + error.message, 'danger');
                 }
+            },
+
+            // Add this new function to handle real-time updates
+            setupRealtimeListeners: function() {
+                // Clean up any existing listeners
+                if (this.currentSessions) {
+                    this.currentSessions.forEach(session => {
+                        if (session.attendeesRef) {
+                            window.dbOff(session.attendeesRef);
+                        }
+                    });
+                }
+                
+                // Set up new listeners for each active session
+                this.currentSessions.forEach(session => {
+                    const attendeesRef = window.dbRef(window.database, `sessions/${session.id}/attendees`);
+                    window.dbOnValue(attendeesRef, (snapshot) => {
+                        const attendees = snapshot.val() || {};
+                        session.attendees = Object.values(attendees);
+                        session.attendeeCount = session.attendees.length;
+                        
+                        // Update displays
+                        this.updateAttendanceList(session);
+                        this.updateSessionDisplay(session);
+                        
+                        // Save to local storage
+                        this.saveSessionToLocal(session);
+                        
+                        // Update session history
+                        this.renderSessionHistory();
+                    });
+                });
             }
         };
 
