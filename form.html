@@ -532,13 +532,29 @@
                         isFull: attendeeList.length >= this.sessionData.maxAttendees
                     });
                     
-                        this.sessionData.attendees = attendeeList;
-                        this.updateAttendanceCount();
+                    this.sessionData.attendees = attendeeList;
+                    this.updateAttendanceCount();
+                    
+                    // Update attendance display
+                    document.getElementById('attendedCount').textContent = attendeeList.length;
                     
                     // Check if session is full
                     if (attendeeList.length >= this.sessionData.maxAttendees) {
                         document.getElementById('submitBtn').disabled = true;
                         this.showMessage('This session is full', 'info');
+                    }
+                    
+                    // Update session history in parent window if it exists
+                    try {
+                        if (window.opener && !window.opener.closed) {
+                            window.opener.postMessage({
+                                type: 'attendanceUpdate',
+                                sessionId: this.sessionId,
+                                attendees: attendeeList
+                            }, window.location.origin);
+                        }
+                    } catch (error) {
+                        console.warn('Could not update parent window:', error);
                     }
                 }, (error) => {
                     console.error('Attendees listener error:', error);
@@ -613,127 +629,6 @@
                 }
             },
 
-            submitAttendance: async function() {
-                const submitBtn = document.getElementById('submitBtn');
-                const form = document.getElementById('attendanceForm');
-                
-                try {
-                    submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-
-                    if (!this.sessionData || !this.sessionData.active) {
-                        throw new Error('Session is not active');
-                    }
-
-                    const studentId = document.getElementById('student_id').value.trim();
-                    const password = document.getElementById('password').value;
-
-                    // Validate password if required
-                    if (this.sessionData.password && password !== this.sessionData.password) {
-                        throw new Error('Incorrect session password');
-                    }
-
-                    // Check if student exists in roster
-                    const student = this.sessionData.roster.find(s => s.id === studentId);
-                    if (!student) {
-                        throw new Error('Student ID not found in roster');
-                    }
-
-                    // Check if student already attended
-                    const existingAttendee = Object.values(this.sessionData.attendees || {}).find(a => a.id === studentId);
-                    if (existingAttendee) {
-                        throw new Error('Attendance already recorded for this ID');
-                    }
-
-                    // If location is enabled, verify it first
-                    let locationVerification = null;
-                    if (this.sessionData.useLocation) {
-                        locationVerification = await this.verifyLocation();
-                        if (!locationVerification.success) {
-                            throw new Error(locationVerification.message);
-                        }
-                    }
-
-                    // Prepare attendance data
-                    const attendanceData = {
-                        id: student.id,
-                        name: student.name,
-                        section: student.section,
-                        timestamp: new Date().toISOString(),
-                        deviceInfo: {
-                            id: this.deviceId,
-                            ip: this.currentIP,
-                            userAgent: navigator.userAgent
-                        },
-                        notes: []
-                    };
-
-                    // Check for same IP in existing attendees
-                    if (this.sessionData.attendees) {
-                        const sameIPAttendees = Object.values(this.sessionData.attendees)
-                            .filter(a => a.deviceInfo?.ip === this.currentIP && a.id !== student.id)
-                            .map(a => ({id: a.id, name: a.name}));
-                            
-                        if (sameIPAttendees.length > 0) {
-                            const sameIPInfo = sameIPAttendees.map(a => a.id).join(', ');
-                            attendanceData.notes.push(`Same IP address with ${sameIPInfo}`);
-                        }
-                    }
-
-                    // Add location data if verified
-                    if (locationVerification?.locationData) {
-                        attendanceData.location = {
-                            verified: true,
-                            coordinates: locationVerification.locationData.coordinates,
-                            accuracy: locationVerification.locationData.accuracy,
-                            distance: locationVerification.locationData.distance,
-                            timestamp: locationVerification.locationData.timestamp,
-                            verificationMessage: locationVerification.message
-                        };
-                    }
-
-                    // Save attendance record
-                    const newAttendanceRef = await window.dbPush(this.attendeesRef, attendanceData);
-                    
-                    if (!newAttendanceRef) {
-                        throw new Error('Failed to save attendance record');
-                    }
-
-                    // Show success message
-                    this.showMessage('✅ Attendance recorded successfully!', 'success');
-                    
-                    // Update UI to show completion
-                    form.reset();
-                    submitBtn.innerHTML = '<i class="fas fa-check"></i> Attendance Recorded';
-                    submitBtn.style.background = 'var(--success)';
-                    submitBtn.disabled = true;
-                    
-                    // Disable form inputs
-                    document.getElementById('student_id').disabled = true;
-                    if (document.getElementById('password')) {
-                        document.getElementById('password').disabled = true;
-                    }
-                    
-                    // Show completion message
-                    const messageDiv = document.getElementById('message');
-                    messageDiv.innerHTML = `
-                        <div style="text-align: center;">
-                            <i class="fas fa-check-circle" style="font-size: 3rem; color: var(--success); margin-bottom: 1rem;"></i>
-                            <h3>Attendance Recorded Successfully!</h3>
-                            <p>You can now close this page.</p>
-                        </div>
-                    `;
-                    messageDiv.className = 'alert alert-success';
-                    messageDiv.style.display = 'block';
-                    
-                } catch (error) {
-                    console.error('Attendance submission error:', error);
-                    this.showMessage(error.message, 'danger');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
-                }
-            },
-
             verifyLocation: async function() {
                 return new Promise((resolve) => {
                     console.log('Starting verification process...');
@@ -741,6 +636,7 @@
                     // First check if we have the current IP
                     if (!this.currentIP) {
                         console.log('No IP address available');
+                        document.getElementById('submitBtn').disabled = true;
                         resolve({ 
                             success: false, 
                             message: 'Unable to verify device identity',
@@ -775,6 +671,7 @@
                     // Check if location verification is possible
                     if (!this.sessionData.classLocation) {
                         console.log('No class location set');
+                        document.getElementById('submitBtn').disabled = true;
                         resolve({ 
                             success: false, 
                             message: 'No class location has been set by the instructor',
@@ -785,6 +682,7 @@
 
                     if (!navigator.geolocation) {
                         console.log('Geolocation not supported');
+                        document.getElementById('submitBtn').disabled = true;
                         resolve({ 
                             success: false,
                             message: 'Your browser does not support location services. Please use a modern browser.',
@@ -792,7 +690,7 @@
                         });
                         return;
                     }
-                    
+
                     this.showMessage('Verifying your location...', 'info');
                     
                     // Get student's location and verify distance
@@ -831,17 +729,18 @@
                             
                             const isWithinRange = distance <= totalAllowedDistance;
                             const submitBtn = document.getElementById('submitBtn');
-                            submitBtn.disabled = !isWithinRange;
                             
-                            console.log('Location verification result:', isWithinRange ? 'Within range' : 'Out of range');
-
                             if (isWithinRange) {
+                                console.log('Student within range - enabling submit button');
+                                submitBtn.disabled = false;
                                 resolve({ 
                                     success: true,
                                     message: `Location verified (${Math.round(distance)}m from class)`,
                                     locationData: locationData
                                 });
                             } else {
+                                console.log('Student out of range - disabling submit button');
+                                submitBtn.disabled = true;
                                 resolve({ 
                                     success: false,
                                     message: `You are ${Math.round(distance)}m from the class location. Maximum allowed distance is ${maxDistance}m (plus ${accuracyBuffer}m accuracy buffer).`,
@@ -1158,6 +1057,138 @@
                         message += error.message;
                 }
                 this.showMessage(message, 'danger');
+            },
+
+            submitAttendance: async function() {
+                const submitBtn = document.getElementById('submitBtn');
+                const form = document.getElementById('attendanceForm');
+                
+                try {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+                    if (!this.sessionData || !this.sessionData.active) {
+                        throw new Error('Session is not active');
+                    }
+
+                    const studentId = document.getElementById('student_id').value.trim();
+                    const password = document.getElementById('password').value;
+
+                    // Validate password if required
+                    if (this.sessionData.password && password !== this.sessionData.password) {
+                        throw new Error('Incorrect session password');
+                    }
+
+                    // Check if student exists in roster
+                    const student = this.sessionData.roster.find(s => s.id === studentId);
+                    if (!student) {
+                        throw new Error('Student ID not found in roster');
+                    }
+
+                    // Check if student already attended
+                    const existingAttendee = Object.values(this.sessionData.attendees || {}).find(a => a.id === studentId);
+                    if (existingAttendee) {
+                        throw new Error('Attendance already recorded for this ID');
+                    }
+
+                    // If location is enabled, verify it first
+                    let locationVerification = null;
+                    if (this.sessionData.useLocation) {
+                        locationVerification = await this.verifyLocation();
+                        if (!locationVerification.success) {
+                            throw new Error(locationVerification.message || 'Location verification failed');
+                        }
+                        
+                        // Double check that student is still within range
+                        if (locationVerification.locationData && 
+                            locationVerification.locationData.distance > (this.sessionData.locationDistance || 50)) {
+                            throw new Error('You must be within the allowed distance to submit attendance');
+                        }
+                    }
+
+                    // Prepare attendance data
+                    const attendanceData = {
+                        id: student.id,
+                        name: student.name,
+                        section: student.section,
+                        timestamp: new Date().toISOString(),
+                        deviceInfo: {
+                            id: this.deviceId,
+                            ip: this.currentIP,
+                            userAgent: navigator.userAgent
+                        },
+                        notes: []
+                    };
+
+                    // Check for same IP in existing attendees
+                    if (this.sessionData.attendees) {
+                        const sameIPAttendees = Object.values(this.sessionData.attendees)
+                            .filter(a => a.deviceInfo?.ip === this.currentIP && a.id !== student.id)
+                            .map(a => ({id: a.id, name: a.name}));
+                            
+                        if (sameIPAttendees.length > 0) {
+                            const sameIPInfo = sameIPAttendees.map(a => a.id).join(', ');
+                            attendanceData.notes.push(`Same IP address with ${sameIPInfo}`);
+                        }
+                    }
+
+                    // Add location data if verified
+                    if (locationVerification?.locationData) {
+                        attendanceData.location = {
+                            verified: true,
+                            coordinates: locationVerification.locationData.coordinates,
+                            accuracy: locationVerification.locationData.accuracy,
+                            distance: locationVerification.locationData.distance,
+                            timestamp: locationVerification.locationData.timestamp,
+                            verificationMessage: locationVerification.message
+                        };
+                    }
+
+                    // Save attendance record
+                    const newAttendanceRef = await window.dbPush(this.attendeesRef, attendanceData);
+                    
+                    if (!newAttendanceRef) {
+                        throw new Error('Failed to save attendance record');
+                    }
+
+                    // Show success message
+                    this.showMessage('✅ Attendance recorded successfully!', 'success');
+                    
+                    // Update UI to show completion
+                    form.reset();
+                    submitBtn.innerHTML = '<i class="fas fa-check"></i> Attendance Recorded';
+                    submitBtn.style.background = 'var(--success)';
+                    submitBtn.disabled = true;
+                    
+                    // Disable form inputs
+                    document.getElementById('student_id').disabled = true;
+                    if (document.getElementById('password')) {
+                        document.getElementById('password').disabled = true;
+                    }
+                    
+                    // Show completion message
+                    const messageDiv = document.getElementById('message');
+                    messageDiv.innerHTML = `
+                        <div style="text-align: center;">
+                            <i class="fas fa-check-circle" style="font-size: 3rem; color: var(--success); margin-bottom: 1rem;"></i>
+                            <h3>Attendance Recorded Successfully!</h3>
+                            <p>You can now close this page.</p>
+                        </div>
+                    `;
+                    messageDiv.className = 'alert alert-success';
+                    messageDiv.style.display = 'block';
+                    
+                } catch (error) {
+                    console.error('Attendance submission error:', error);
+                    this.showMessage(error.message, 'danger');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
+                    
+                    // Re-verify location if there was an error
+                    if (this.sessionData?.useLocation) {
+                        this.startLocationCheck();
+                    }
+                }
             }
         };
 
