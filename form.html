@@ -1012,33 +1012,69 @@
             },
             
             handleLocationSuccess: function(position) {
-                this.currentLocation = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude,
-                    accuracy: position.coords.accuracy,
-                    timestamp: new Date().toISOString()
-                };
+                const distance = this.calculateDistance(
+                    position.coords.latitude,
+                    position.coords.longitude,
+                    this.sessionData.classLocation.lat,
+                    this.sessionData.classLocation.lng
+                );
                 
-                if (this.sessionData.useLocation) {
-                    const distance = this.calculateDistance(
-                        this.currentLocation.lat,
-                        this.currentLocation.lng,
-                        this.sessionData.classLocation.lat,
-                        this.sessionData.classLocation.lng
-                    );
-                    
-                    const maxDistance = this.sessionData.locationDistance || 50;
-                    const isWithinRange = distance <= maxDistance;
-                    
-                    const locationStatus = document.getElementById('locationStatus');
-                    locationStatus.className = `alert alert-${isWithinRange ? 'success' : 'danger'}`;
-                    locationStatus.textContent = isWithinRange ?
-                        `✓ You are within range (${Math.round(distance)}m from class location)` :
-                        `⚠ You are too far (${Math.round(distance)}m from class location)`;
-                    
-                    // Enable/disable submit button based on location
-                    document.getElementById('submitBtn').disabled = !isWithinRange;
+                const maxDistance = this.sessionData.locationDistance || 50;
+                const accuracyBuffer = Math.min(position.coords.accuracy, 20);
+                const totalAllowedDistance = maxDistance + accuracyBuffer;
+                const isWithinRange = distance <= totalAllowedDistance;
+                
+                const submitBtn = document.getElementById('submitBtn');
+                submitBtn.disabled = !isWithinRange;
+                
+                // Update location status with clear visual feedback
+                const locationStatus = document.createElement('div');
+                locationStatus.className = `alert ${isWithinRange ? 'alert-success' : 'alert-danger'}`;
+                locationStatus.style.marginTop = '1rem';
+                
+                if (isWithinRange) {
+                    locationStatus.innerHTML = `
+                        <i class="fas fa-check-circle"></i> 
+                        You are within range (${Math.round(distance)}m from class location)
+                    `;
+                } else {
+                    locationStatus.innerHTML = `
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        You are too far from the class location!<br>
+                        - Your distance: ${Math.round(distance)}m<br>
+                        - Maximum allowed: ${maxDistance}m<br>
+                        - Location accuracy: ±${Math.round(accuracyBuffer)}m<br>
+                        <strong>Please move closer to the class location to submit attendance.</strong>
+                    `;
                 }
+                
+                // Update or add the location status to the form
+                const existingStatus = document.getElementById('locationStatus');
+                if (existingStatus) {
+                    existingStatus.replaceWith(locationStatus);
+                } else {
+                    document.getElementById('attendanceForm').insertBefore(
+                        locationStatus,
+                        document.getElementById('submitBtn')
+                    );
+                }
+                locationStatus.id = 'locationStatus';
+                
+                return {
+                    success: isWithinRange,
+                    message: isWithinRange ? 
+                        `Location verified (${Math.round(distance)}m from class)` :
+                        `You are ${Math.round(distance)}m from the class location. Maximum allowed distance is ${maxDistance}m.`,
+                    locationData: {
+                        coordinates: {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        },
+                        accuracy: accuracyBuffer,
+                        timestamp: new Date().toISOString(),
+                        distance: Math.round(distance)
+                    }
+                };
             },
             
             handleLocationError: function(error) {
