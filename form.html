@@ -477,10 +477,14 @@
                     }
 
                     const sessionData = sessionSnapshot.val();
+                    if (!sessionData) {
+                        throw new Error('Invalid session data');
+                    }
+
                     console.log('Initial session data:', sessionData ? 'received' : 'empty');
                     console.log('Session active status:', sessionData.active);
                     
-                        this.sessionData = sessionData;
+                    this.sessionData = sessionData;
                     this.attendeesRef = window.dbRef(window.database, `sessions/${this.currentSessionId}/attendees`);
 
                     // Show initial session state first
@@ -488,59 +492,83 @@
                         console.log('Session is not active, showing closed state');
                         this.showClosedSession();
                         return;
-                    } else {
-                        console.log('Session is active, showing active state');
-                        this.showActiveSession();
-                        this.updateConnectionStatus('connected');
-                        
-                        // If location check is enabled, start GPS
-                        if (this.sessionData.useLocation) {
-                            this.startLocationCheck();
+                    }
+
+                    // Initialize UI first
+                    this.showActiveSession();
+                    this.updateConnectionStatus('connected');
+                    
+                    // Handle location check if needed
+                    if (this.sessionData.useLocation) {
+                        try {
+                            await this.startLocationCheck();
+                        } catch (error) {
+                            console.warn('Location check failed:', error);
+                            // Show warning but don't block session
+                            this.showMessage('Location verification failed: ' + error.message, 'warning');
                         }
                     }
 
-                    // Set up real-time listener
+                    // Set up real-time listeners
+                    this.setupRealtimeListeners();
+
+                } catch (error) {
+                    console.error('Session initialization error:', error);
+                    this.handleInitializationError(error);
+                }
+            },
+
+            setupRealtimeListeners: function() {
+                // Session listener
                 window.dbOnValue(this.sessionRef, (snapshot) => {
                     const data = snapshot.val();
-                        if (!data) {
-                            this.showNoSession();
-                            return;
-                        }
+                    if (!data) {
+                        this.showNoSession();
+                        return;
+                    }
                     
-                        this.sessionData = data;
-                        
-                        if (!this.sessionData.active) {
+                    this.sessionData = data;
+                    
+                    if (!this.sessionData.active) {
                         this.showClosedSession();
                         return;
                     }
                     
-                        this.showActiveSession();
-                        this.updateConnectionStatus('connected');
-                        
-                        if (this.sessionData.password) {
-                            document.getElementById('passwordField').classList.remove('hidden');
-                        }
-                    });
-                    
-                    // Set up attendees listener
+                    this.updateSessionDisplay();
+                    this.updateConnectionStatus('connected');
+                }, (error) => {
+                    console.error('Session listener error:', error);
+                    this.showMessage('Connection error: ' + error.message, 'danger');
+                    this.updateConnectionStatus('error');
+                });
+                
+                // Attendees listener
                 window.dbOnValue(this.attendeesRef, (snapshot) => {
+                    if (!this.sessionData) return;
+                    
                     const attendees = snapshot.val() || {};
                     const attendeeList = Object.values(attendees);
-                        console.log('Received attendees update:', attendeeList.length, 'attendees');
+                    console.log('Received attendees update:', attendeeList.length, 'attendees');
                     
-                    if (this.sessionData) {
-                        this.sessionData.attendees = attendeeList;
-                        this.updateAttendanceCount();
-                    }
-                    }, (error) => {
-                        console.error('Attendees listener error:', error);
-                    });
+                    this.sessionData.attendees = attendeeList;
+                    this.updateAttendanceCount();
+                }, (error) => {
+                    console.error('Attendees listener error:', error);
+                    this.showMessage('Error updating attendance list', 'warning');
+                });
+            },
 
-                } catch (error) {
-                    console.error('Session initialization error:', error);
-                    this.showMessage('Failed to connect to session: ' + error.message, 'danger');
-                    this.updateConnectionStatus('error');
+            handleInitializationError: function(error) {
+                if (error.message.includes('not found') || 
+                    error.message.includes('does not exist') || 
+                    error.message.includes('Invalid session')) {
                     this.showNoSession();
+                } else if (error.message.includes('Firebase') || error.message.includes('connection')) {
+                    this.showMessage('Connection error: ' + error.message, 'danger');
+                    this.updateConnectionStatus('error');
+                } else {
+                    this.showMessage('Error: ' + error.message, 'danger');
+                    this.updateConnectionStatus('error');
                 }
             },
 
@@ -557,10 +585,7 @@
                         week: this.sessionData.week,
                         maxAttendees: this.sessionData.maxAttendees
                     });
-                    document.getElementById('displaySubject').textContent = this.sessionData.subject || '-';
-                    document.getElementById('displayWeek').textContent = this.sessionData.week || '-';
-                    document.getElementById('maxAttendees').textContent = this.sessionData.maxAttendees || '-';
-                    this.updateAttendanceCount();
+                    this.updateSessionDisplay();
                 }
             },
 
@@ -613,6 +638,7 @@
                     const studentId = document.getElementById('student_id').value.trim();
                     const password = document.getElementById('password').value;
 
+                    // Validate password if required
                     if (this.sessionData.password && password !== this.sessionData.password) {
                         this.showMessage('Incorrect session password', 'danger');
                         submitBtn.disabled = false;
@@ -638,34 +664,46 @@
                         return;
                     }
 
-                    // Handle location check
+                    // Prepare base attendance data
+                    const attendanceData = {
+                        id: student.id,
+                        name: student.name,
+                        section: student.section,
+                        timestamp: new Date().toISOString(),
+                        deviceInfo: {
+                            id: this.deviceId,
+                            ip: this.currentIP,
+                            userAgent: navigator.userAgent
+                        }
+                    };
+
+                    // Handle location verification if enabled
                     if (this.sessionData.useLocation) {
                         const locationResult = await this.verifyLocation();
-                        if (!locationResult.success) {
+                        
+                        // Always include location attempt data
+                        attendanceData.location = {
+                            verified: locationResult.success,
+                            verificationMessage: locationResult.message,
+                            data: locationResult.locationData,
+                            timestamp: new Date().toISOString()
+                        };
+
+                        if (!locationResult.success && this.sessionData.requireLocation) {
                             this.showMessage(locationResult.message, 'danger');
                             submitBtn.disabled = false;
                             submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
                             return;
                         }
-                        // Show success message for location
-                        this.showMessage(locationResult.message, 'success');
                     }
 
-                    // Record attendance
-                    const attendanceData = {
-                        id: student.id,
-                        name: student.name,
-                        section: student.section,
-                        timestamp: Date.now(),
-                        deviceId: this.deviceId,
-                        ip: this.currentIP
-                    };
-
-                    if (this.lastLocation) {
-                        attendanceData.location = this.lastLocation;
+                    // Save attendance record
+                    const newAttendanceRef = await window.dbPush(this.attendeesRef, attendanceData);
+                    
+                    if (!newAttendanceRef) {
+                        throw new Error('Failed to save attendance record');
                     }
 
-                    await window.dbPush(this.attendeesRef, attendanceData);
                     this.showMessage('✅ Attendance recorded successfully!', 'success');
                     document.getElementById('attendanceForm').reset();
                     submitBtn.innerHTML = '<i class="fas fa-check"></i> Attendance Recorded';
@@ -688,39 +726,24 @@
             verifyLocation: async function() {
                 return new Promise((resolve) => {
                     if (!this.sessionData.classLocation) {
-                        resolve({ success: true, message: 'No location constraint set' });
+                        resolve({ 
+                            success: true, 
+                            message: 'No location constraint set',
+                            locationData: null 
+                        });
                         return;
                     }
 
                     if (!navigator.geolocation) {
                         resolve({ 
                             success: false,
-                            message: 'Geolocation is not supported by your browser. Please use a modern browser with location services enabled.'
+                            message: 'Geolocation is not supported by your browser',
+                            locationData: null
                         });
                         return;
                     }
                     
-                    // Show location checking message
                     this.showMessage('Checking your location...', 'info');
-                    
-                    const handleLocationError = (error) => {
-                        console.error('Location error:', error);
-                        let message = 'Could not get your location. ';
-                        switch(error.code) {
-                            case error.PERMISSION_DENIED:
-                                message += 'Please enable location services in your browser settings.';
-                                break;
-                            case error.POSITION_UNAVAILABLE:
-                                message += 'Location information is unavailable. Please try again or check your device settings.';
-                                break;
-                            case error.TIMEOUT:
-                                message += 'Location request timed out. Please try again.';
-                                break;
-                            default:
-                                message += 'Please make sure location services are enabled.';
-                        }
-                        resolve({ success: false, message });
-                    };
                     
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
@@ -735,31 +758,48 @@
                                 classLat, classLng
                             );
 
-                            this.lastLocation = {
-                                latitude: studentLat,
-                                longitude: studentLng,
+                            // Create standardized location object
+                            const locationData = {
+                                coordinates: {
+                                    latitude: studentLat,
+                                    longitude: studentLng
+                                },
                                 accuracy: position.coords.accuracy,
-                                distance: distance
+                                timestamp: new Date(position.timestamp).toISOString(),
+                                distance: Math.round(distance),
+                                classLocation: {
+                                    latitude: classLat,
+                                    longitude: classLng
+                                }
                             };
 
                             const maxDistance = this.sessionData.locationDistance || 50;
                             if (distance <= maxDistance) {
                                 resolve({ 
                                     success: true,
-                                    message: `Location verified (${distance.toFixed(0)}m from class)`
+                                    message: `Location verified (${Math.round(distance)}m from class)`,
+                                    locationData: locationData
                                 });
                             } else {
                                 resolve({ 
                                     success: false,
-                                    message: `Too far from class location (${distance.toFixed(0)}m away, max ${maxDistance}m allowed)`
+                                    message: `Too far from class location (${Math.round(distance)}m away, max ${maxDistance}m allowed)`,
+                                    locationData: locationData
                                 });
                             }
                         },
-                        handleLocationError,
+                        (error) => {
+                            resolve({ 
+                                success: false,
+                                message: this.getLocationErrorMessage(error),
+                                locationData: null,
+                                error: error.code
+                            });
+                        },
                         { 
                             enableHighAccuracy: true, 
-                            timeout: 15000, // Increased timeout
-                            maximumAge: 0
+                            timeout: 15000,
+                            maximumAge: 0 
                         }
                     );
                 });
@@ -811,46 +851,86 @@
                 }
             },
 
-            startLocationCheck: function() {
-                if (!navigator.geolocation) {
-                    this.showMessage('Geolocation is not supported by your browser', 'danger');
-                            return;
+            updateSessionDisplay: function() {
+                if (this.sessionData) {
+                    document.getElementById('displaySubject').textContent = this.sessionData.subject || '-';
+                    document.getElementById('displayWeek').textContent = this.sessionData.week || '-';
+                    document.getElementById('maxAttendees').textContent = this.sessionData.maxAttendees || '-';
+                    this.updateAttendanceCount();
                 }
+            },
 
-                const locationStatus = document.getElementById('locationStatus');
-                locationStatus.textContent = 'Getting your location...';
-                document.getElementById('locationVerification').style.display = 'block';
+            startLocationCheck: async function() {
+                return new Promise((resolve, reject) => {
+                    if (!navigator.geolocation) {
+                        reject(new Error('Geolocation not supported by your browser'));
+                        return;
+                    }
 
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const { latitude, longitude, accuracy } = position.coords;
-                        this.studentLocation = { lat: latitude, lng: longitude, accuracy };
-                        
-                        if (this.sessionData.classLocation) {
-                            const distance = this.calculateDistance(
-                                latitude,
-                                longitude,
-                                this.sessionData.classLocation.lat,
-                                this.sessionData.classLocation.lng
-                            );
+                    this.showMessage('Checking location access...', 'info');
 
-                            const maxDistance = this.sessionData.locationDistance || 50;
-                            if (distance <= maxDistance + accuracy) {
-                                locationStatus.innerHTML = '<i class="fas fa-check-circle"></i> Location verified';
-                                locationStatus.className = 'text-success';
-                                document.getElementById('submitBtn').disabled = false;
-                            } else {
-                                this.showMessage(`You are too far from the class location (${Math.round(distance)}m away)`, 'danger');
-                                document.getElementById('submitBtn').disabled = true;
+                    const locationTimeout = setTimeout(() => {
+                        reject(new Error('Location request timed out'));
+                    }, 15000);
+
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            clearTimeout(locationTimeout);
+                            try {
+                                const { latitude, longitude, accuracy } = position.coords;
+                                this.studentLocation = { lat: latitude, lng: longitude, accuracy };
+                                
+                                if (!this.sessionData?.classLocation) {
+                                    resolve();
+                                    return;
+                                }
+
+                                const distance = this.calculateDistance(
+                                    latitude, longitude,
+                                    this.sessionData.classLocation.lat,
+                                    this.sessionData.classLocation.lng
+                                );
+
+                                const maxDistance = this.sessionData.locationDistance || 50;
+                                if (distance <= maxDistance + accuracy) {
+                                    this.showMessage('Location verified', 'success');
+                                    resolve();
+                                } else {
+                                    reject(new Error(`Too far from class location (${Math.round(distance)}m away, max ${maxDistance}m allowed)`));
+                                }
+                            } catch (error) {
+                                reject(new Error('Error processing location: ' + error.message));
                             }
+                        },
+                        (error) => {
+                            clearTimeout(locationTimeout);
+                            reject(new Error(this.getLocationErrorMessage(error)));
+                        },
+                        { 
+                            enableHighAccuracy: true, 
+                            timeout: 15000,
+                            maximumAge: 0 
                         }
-                    },
-                    (error) => {
-                        this.showMessage('Error getting location: ' + error.message, 'danger');
-                        document.getElementById('submitBtn').disabled = true;
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
+                    );
+                });
+            },
+
+            getLocationErrorMessage: function(error) {
+                let message = 'Location error: ';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        message += 'Permission denied. Please enable location services in your browser settings.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        message += 'Location information is unavailable. Please try again or check your device settings.';
+                        break;
+                    case error.TIMEOUT:
+                        message += 'Location request timed out. Please try again.';
+                        break;
+                    default:
+                        message += 'Please make sure location services are enabled.';
+                }
+                return message;
             }
         };
 
