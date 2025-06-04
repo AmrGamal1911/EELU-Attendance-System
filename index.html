@@ -24,310 +24,18 @@
                 measurementId: "G-D2WNX8RGRL"
             };
 
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
+        const firebaseApp = initializeApp(firebaseConfig);
+        const database = getDatabase(firebaseApp);
 
-        class AttendanceSystem {
-            constructor() {
-                this.rosterData = [];
-                this.subjectName = '';
-                this.existingWeeks = [];
-                this.maxExistingWeek = 0;
-                this.savedLocations = JSON.parse(localStorage.getItem('savedLocations') || '{}');
-                this.setupEventListeners();
-                this.initializeUI();
-            }
-
-            setupEventListeners() {
-                // File upload handling
-                const rosterInput = document.getElementById('roster');
-                const dropZone = document.querySelector('.file-upload');
-
-                dropZone.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    dropZone.classList.add('drag-over');
-                });
-
-                dropZone.addEventListener('dragleave', () => {
-                    dropZone.classList.remove('drag-over');
-                });
-
-                dropZone.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    dropZone.classList.remove('drag-over');
-                    const file = e.dataTransfer.files[0];
-                    if (file) this.handleFileUpload(file);
-                });
-
-                rosterInput.addEventListener('change', (e) => {
-                    const file = e.target.files[0];
-                    if (file) this.handleFileUpload(file);
-                });
-
-                // Location toggle handling
-                const locationToggle = document.getElementById('useLocation');
-                locationToggle.addEventListener('change', () => {
-                    document.getElementById('locationSettings').classList.toggle('hidden', !locationToggle.checked);
-                });
-
-                // Form submission
-                document.getElementById('sessionForm').addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    this.createSession();
-                });
-
-                // QR code scanning for location
-                document.getElementById('scanLocationBtn').addEventListener('click', () => {
-                    this.openLocationScanner();
-                });
-
-                // Listen for location data from mobile page
-                window.addEventListener('message', (event) => {
-                    if (event.data.type === 'location') {
-                        this.handleLocationData(event.data);
-                    }
-                });
-            }
-
-            initializeUI() {
-                // Initialize saved locations dropdown
-                this.updateLocationDropdown();
-                
-                // Set up subject name handling
-                const subjectInput = document.getElementById('subjectNameInput');
-                subjectInput.addEventListener('input', () => {
-                    this.subjectName = subjectInput.value.trim();
-                    this.updateCreateButtonState();
-                });
-            }
-
-            updateLocationDropdown() {
-                const dropdown = document.getElementById('savedLocations');
-                dropdown.innerHTML = '<option value="">Select a saved location</option>';
-                
-                Object.entries(this.savedLocations).forEach(([name, data]) => {
-                    const option = document.createElement('option');
-                    option.value = name;
-                    option.textContent = `${name} (${data.lat.toFixed(6)}, ${data.lng.toFixed(6)})`;
-                    dropdown.appendChild(option);
-                });
-            }
-
-            async handleFileUpload(file) {
-                try {
-                    const fileNameSpan = document.getElementById('fileName');
-                    fileNameSpan.textContent = file.name;
-
-                    // Auto-fill subject name from filename
-                    const subjectName = file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
-                    document.getElementById('subjectNameInput').value = subjectName;
-                    this.subjectName = subjectName;
-
-                    const data = await this.readExcelFile(file);
-                    this.processRosterData(data);
-                    
-                    document.getElementById('rosterInfo').classList.remove('hidden');
-                    this.updateCreateButtonState();
-                    this.showMessage('Roster uploaded successfully!', 'success');
-                } catch (error) {
-                    console.error('File upload error:', error);
-                    this.showMessage('Error processing file: ' + error.message, 'danger');
-                }
-            }
-
-            async readExcelFile(file) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const data = new Uint8Array(e.target.result);
-                            const workbook = XLSX.read(data, { type: 'array' });
-                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-                            resolve(jsonData);
-                        } catch (error) {
-                            reject(new Error('Invalid file format'));
-                        }
-                    };
-                    reader.onerror = () => reject(new Error('File read error'));
-                    reader.readAsArrayBuffer(file);
-                });
-            }
-
-            processRosterData(data) {
-                // Skip header row and empty rows
-                const rows = data.filter(row => row.length > 0);
-                if (rows.length < 2) throw new Error('File contains no data');
-
-                const headers = rows[0].map(h => String(h).toLowerCase().trim());
-                const idIndex = headers.findIndex(h => h.includes('id'));
-                const nameIndex = headers.findIndex(h => h.includes('name'));
-                const sectionIndex = headers.findIndex(h => h.includes('section'));
-
-                if (idIndex === -1 || nameIndex === -1) {
-                    throw new Error('File must contain student ID and name columns');
-                }
-
-                this.rosterData = [];
-                this.existingWeeks = [];
-
-                // Process each row
-                for (let i = 1; i < rows.length; i++) {
-                    const row = rows[i];
-                    if (!row[idIndex] || !row[nameIndex]) continue;
-
-                    const student = {
-                        id: String(row[idIndex]).trim(),
-                        name: String(row[nameIndex]).trim(),
-                        section: sectionIndex !== -1 ? String(row[sectionIndex] || '').trim() : ''
-                    };
-
-                    // Look for week columns (e.g., "Week 1", "W1", etc.)
-                    headers.forEach((header, index) => {
-                        if (/week|w\s*\d+/i.test(header)) {
-                            const weekNum = parseInt(header.match(/\d+/)[0]);
-                            if (weekNum > this.maxExistingWeek) {
-                                this.maxExistingWeek = weekNum;
-                            }
-                            if (!this.existingWeeks.includes(weekNum)) {
-                                this.existingWeeks.push(weekNum);
-                            }
-                            student[`week${weekNum}`] = row[index] || 0;
-                        }
-                    });
-
-                    this.rosterData.push(student);
-                }
-
-                // Update UI
-                document.getElementById('studentCount').textContent = this.rosterData.length;
-                document.getElementById('weekCount').textContent = 
-                    this.existingWeeks.length ? this.existingWeeks.sort((a,b) => a-b).join(', ') : 'None';
-
-                // Pre-fill week number if possible
-                const weekInput = document.getElementById('week');
-                weekInput.value = this.maxExistingWeek + 1;
-            }
-
-            async createSession() {
-                try {
-                    const week = document.getElementById('week').value;
-                    const maxAttendees = document.getElementById('max_attendees').value;
-                    const email = document.getElementById('ta_email').value;
-                    const useLocation = document.getElementById('useLocation').checked;
-                    
-                    if (!this.rosterData.length || !this.subjectName || !week || !maxAttendees) {
-                        throw new Error('Please fill in all required fields');
-                    }
-
-                    const sessionId = 'session_' + Date.now();
-                    const sessionData = {
-                        id: sessionId,
-                        subject: this.subjectName,
-                        week,
-                        maxAttendees: parseInt(maxAttendees),
-                        roster: this.rosterData,
-                        taEmail: email,
-                        createdAt: serverTimestamp(),
-                        active: true,
-                        attendeeCount: 0,
-                        useLocation,
-                        existingWeeks: [...this.existingWeeks],
-                        maxExistingWeek: this.maxExistingWeek
-                    };
-
-                    // Add location data if enabled
-                    if (useLocation) {
-                        const locationName = document.getElementById('savedLocations').value;
-                        if (!locationName || !this.savedLocations[locationName]) {
-                            throw new Error('Please select a valid location');
-                        }
-                        sessionData.classLocation = this.savedLocations[locationName];
-                        sessionData.locationDistance = parseInt(document.getElementById('locationDistance').value) || 50;
-                    }
-
-                    // Save session to Firebase
-                    await set(ref(database, `sessions/${sessionId}`), sessionData);
-
-                    // Generate QR code
-                    this.generateQRCode(sessionId);
-                    
-                    // Show success message
-                    this.showMessage('Session created successfully!', 'success');
-                    
-                    // Reset form
-                    document.getElementById('sessionForm').reset();
-                    document.getElementById('locationSettings').classList.add('hidden');
-        } catch (error) {
-                    console.error('Session creation error:', error);
-                    this.showMessage(error.message, 'danger');
-                }
-            }
-
-            generateQRCode(sessionId) {
-                const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
-                const qr = qrcode(0, 'L');
-                qr.addData(formUrl);
-                qr.make();
-
-                const qrContainer = document.getElementById('qrCode');
-                qrContainer.innerHTML = qr.createImgTag(10);
-                qrContainer.classList.remove('hidden');
-
-                // Add URL below QR code
-                const urlDiv = document.createElement('div');
-                urlDiv.className = 'mt-4 text-center';
-                urlDiv.innerHTML = `
-                    <p class="mb-2">Session URL:</p>
-                    <input type="text" value="${formUrl}" readonly class="form-control text-center">
-                `;
-                qrContainer.appendChild(urlDiv);
-            }
-
-            openLocationScanner() {
-                const locationId = Date.now();
-                const width = 500;
-                const height = 700;
-                const left = (screen.width - width) / 2;
-                const top = (screen.height - height) / 2;
-                
-                window.open(
-                    'location.html',
-                    'locationScanner',
-                    `width=${width},height=${height},left=${left},top=${top}`
-                );
-            }
-
-            handleLocationData(data) {
-                const { name, data: locationData } = data;
-                this.savedLocations[name] = locationData;
-                localStorage.setItem('savedLocations', JSON.stringify(this.savedLocations));
-                this.updateLocationDropdown();
-                document.getElementById('savedLocations').value = name;
-                this.showMessage(`Location "${name}" saved successfully!`, 'success');
-            }
-
-            showMessage(text, type) {
-                const messageDiv = document.getElementById('message');
-                messageDiv.textContent = text;
-                messageDiv.className = `alert alert-${type}`;
-                messageDiv.classList.remove('hidden');
-                
-                setTimeout(() => {
-                    messageDiv.classList.add('hidden');
-                }, 5000);
-            }
-
-            updateCreateButtonState() {
-                const createBtn = document.getElementById('createSessionBtn');
-                createBtn.disabled = !this.rosterData.length || !this.subjectName;
-            }
-        }
-
-        // Initialize the system when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            new AttendanceSystem();
-        });
+        // Make Firebase functions available globally
+            window.database = database;
+            window.dbRef = ref;
+            window.dbSet = set;
+            window.dbOnValue = onValue;
+            window.dbPush = push;
+        window.dbServerTimestamp = serverTimestamp;
+            window.dbOff = off;
+            window.dbGet = get;
     </script>
     
     <style>
@@ -509,7 +217,7 @@
             width: 16px;
         }
         
-        input, select {
+        input {
             width: 100%;
             padding: 0.875rem 1rem;
             border: 2px solid #e5e7eb;
@@ -518,7 +226,7 @@
             transition: all 0.3s ease;
         }
         
-        input:focus, select:focus {
+        input:focus {
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
             outline: none;
@@ -532,118 +240,635 @@
             margin-bottom: 1.5rem;
             transition: all 0.3s ease;
             background: var(--gradient-light);
-            cursor: pointer;
         }
         
-        .file-upload:hover, .file-upload.drag-over {
+        .file-upload:hover {
             border-color: var(--primary);
             background: rgba(102, 126, 234, 0.05);
         }
         
-        .file-upload input[type="file"] {
-            display: none;
+        #fileName {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        
+        #qrcode {
+            padding: 1.5rem;
+            background: white;
+            border-radius: var(--border-radius);
+            display: inline-block;
+            border: 1px solid #f3f4f6;
+            margin: 1rem 0;
+            box-shadow: var(--shadow);
+            animation: scaleIn 0.5s ease-out;
+        }
+        
+        .session-url {
+            margin: 1.5rem 0;
+        }
+        
+        .session-url .input-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .session-url input {
+            flex: 1;
+        }
+        
+        .copy-btn {
+            padding: 0.875rem;
+            min-width: auto;
         }
         
         .alert {
             padding: 1rem 1.5rem;
             border-radius: var(--border-radius);
             margin-bottom: 1.5rem;
-            animation: slideInDown 0.5s ease-out;
+            border-left: 4px solid;
+            font-weight: 500;
+            animation: slideInRight 0.5s ease-out;
         }
         
         .alert-success {
             background: rgba(16, 185, 129, 0.1);
             color: #047857;
-            border-left: 4px solid var(--success);
+            border-left-color: var(--success);
         }
         
         .alert-danger {
             background: rgba(239, 68, 68, 0.1);
             color: #b91c1c;
-            border-left: 4px solid var(--danger);
+            border-left-color: var(--danger);
         }
         
-        .alert-info {
-            background: rgba(59, 130, 246, 0.1);
-            color: #1d4ed8;
-            border-left: 4px solid var(--info);
+        .session-status {
+            text-align: center;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+        
+        .session-active {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+            color: #047857;
+            border: 2px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .session-inactive {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+            color: #b91c1c;
+            border: 2px solid rgba(239, 68, 68, 0.2);
+        }
+        
+        .sync-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50px;
+        }
+        
+        .sync-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #d1d5db;
+            transition: all 0.3s ease;
+        }
+        
+        .sync-indicator.connected {
+            background: var(--success);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+        }
+        
+        .sync-indicator.connecting {
+            background: var(--warning);
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+        
+        #rosterInfo {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: var(--gradient-light);
+            border-radius: var(--border-radius);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+        
+        .attendance-list {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 1rem;
+            border-radius: var(--border-radius);
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .attendee-item {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideInUp 0.5s ease-out;
+        }
+        
+        .attendee-item:last-child {
+            border-bottom: none;
+        }
+        
+        .attendee-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .attendee-name {
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .attendee-details {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .attendee-time {
+            text-align: right;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .progress-container {
+            margin: 1.5rem 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--gradient);
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+        
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            color: #6b7280;
+            font-weight: 500;
         }
         
         .hidden {
-            display: none;
+            display: none !important;
         }
         
         .flex {
             display: flex;
         }
         
-        .gap-4 {
-            gap: 1rem;
-        }
-        
         .flex-1 {
             flex: 1;
         }
         
-        .text-center {
-            text-align: center;
+        .gap-4 {
+            gap: 1rem;
         }
         
-        .mb-2 {
-            margin-bottom: 0.5rem;
+        .mb-4 {
+            margin-bottom: 1rem;
         }
         
-        .mt-4 {
-            margin-top: 1rem;
-        }
-        
-        .form-control {
+        .qr-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
-            padding: 0.5rem;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .qr-modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            width: 90%;
+            max-width: 500px;
+        }
+        
+        .qr-modal img {
+            width: 100%;
+            max-height: 70vh;
+        }
+        
+        .close-modal {
+            margin-top: 1rem;
+            cursor: pointer;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            margin-left: 10px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: var(--primary);
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        
+        .session-history {
+            margin-top: 2rem;
+        }
+        
+        .session-item {
+            padding: 1rem;
             border: 1px solid #e5e7eb;
             border-radius: var(--border-radius);
-            font-size: 0.875rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
-        @keyframes slideIn {
-            from { transform: translateX(-50%) scaleX(0); }
-            to { transform: translateX(-50%) scaleX(1); }
+        .session-item:hover {
+            background-color: #f8fafc;
+        }
+        
+        .session-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .voice-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--gradient);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+            z-index: 100;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .voice-btn::before {
+            content: 'Voice Commands';
+            position: absolute;
+            right: 70px;
+            white-space: nowrap;
+            background: var(--gradient);
+            padding: 0.5rem 1rem;
+            border-radius: 30px;
+            opacity: 0;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+        
+        .voice-btn:hover {
+            width: 200px;
+            border-radius: 30px;
+            justify-content: flex-end;
+            padding-right: 1rem;
+        }
+        
+        .voice-btn:hover::before {
+            opacity: 1;
+            right: 50px;
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius-lg);
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal.hidden {
+            display: none;
+        }
+        
+        .full-width {
+            width: 100%;
+        }
+        
+        .pac-container {
+            z-index: 2100 !important;
+        }
+        
+        .location-btn {
+            display: none;
+            margin-left: 10px;
+            padding: 0.5rem;
         }
         
         @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
-        @keyframes slideInDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) scaleX(0);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) scaleX(1);
+            }
         }
         
-        @media (max-width: 640px) {
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        @media (max-width: 768px) {
             .container {
                 padding: 1rem;
-            }
-            
-            .card {
-                padding: 1.5rem;
             }
             
             header h1 {
                 font-size: 2rem;
             }
             
-            .flex {
+            .card {
+                padding: 1.5rem;
+            }
+            
+            .session-url .input-group {
                 flex-direction: column;
             }
             
-            .gap-4 {
+            .attendee-item {
+                flex-direction: column;
+                align-items: flex-start;
                 gap: 0.5rem;
+            }
+            
+            .attendee-time {
+                text-align: left;
+            }
+            
+            .voice-btn:hover {
+                width: 60px;
+                border-radius: 50%;
+                justify-content: center;
+                padding-right: 0;
+            }
+            
+            .voice-btn:hover::before {
+                display: none;
+            }
+        }
+
+        .session-card {
+            margin-bottom: 2rem;
+        }
+
+        .session-card:last-child {
+            margin-bottom: 0;
+        }
+        
+        .update-subject-btn {
+            margin-left: 10px;
+            padding: 0.5rem;
+            background: var(--info);
+            color: white;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .session-feedback {
+            text-align: center;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            background: #f8fafc;
+            margin-bottom: 1.5rem;
+        }
+
+        .text-red-500 {
+            color: #ef4444;
+        }
+        
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(102, 126, 234, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .student-qr-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+            max-height: 70vh;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .student-qr-item {
+            background: #f8fafc;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .student-qr-item img {
+            width: 100%;
+            height: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: var(--border-radius);
+        }
+
+        .student-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .student-info span {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .student-links-grid {
+            display: grid;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .student-link-item {
+            background: #f8fafc;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            border: 1px solid #e5e7eb;
+        }
+
+        .link-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .link-actions input {
+            flex: 1;
+            font-size: 0.875rem;
+            padding: 0.5rem;
+            background: white;
+        }
+
+        .btn-sm {
+            padding: 0.5rem;
+            min-width: auto;
+        }
+
+        @media (max-width: 640px) {
+            .student-qr-list {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -660,98 +885,1548 @@
         <!-- Upload Roster Section -->
         <div class="card">
             <h2><i class="fas fa-cloud-upload-alt"></i> Upload Student Roster</h2>
-                <div class="file-upload">
-                    <input type="file" id="roster" name="roster" accept=".xlsx,.csv" hidden>
-                <label for="roster">
-                    <i class="fas fa-file-excel"></i>
-                    <span>Drag & drop or click to upload Excel/CSV file</span>
-                    </label>
-                <div id="fileName">No file selected</div>
-                </div>
-                <div id="rosterInfo" class="hidden">
-                    <div class="flex gap-4">
-                        <div class="form-group flex-1">
-                        <label for="subjectNameInput">
-                            <i class="fas fa-book"></i> Subject Name
-                        </label>
-                                <input type="text" id="subjectNameInput" placeholder="Enter subject name">
-                        </div>
-                        <div class="flex-1">
-                            <p><strong><i class="fas fa-users"></i> Students:</strong> <span id="studentCount">0</span></p>
-                            <p><strong><i class="fas fa-calendar-week"></i> Detected Weeks:</strong> <span id="weekCount">None</span></p>
+            <div class="file-upload">
+                <input type="file" id="roster" name="roster" accept=".xlsx,.csv" hidden>
+                <label for="roster" class="btn">
+                    <i class="fas fa-file-excel"></i> Select Excel/CSV File
+                </label>
+                <div id="fileName">Drag & drop or click to browse files</div>
+            </div>
+            <div id="rosterInfo" class="hidden">
+                <div class="flex gap-4">
+                    <div class="form-group flex-1">
+                        <label for="subjectNameInput"><i class="fas fa-book"></i> Subject Name</label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="text" id="subjectNameInput" placeholder="Enter subject name">
+                            <button type="button" class="update-subject-btn" onclick="attendanceApp.updateSubjectName()">
+                                <i class="fas fa-sync-alt"></i> Update
+                            </button>
                         </div>
                     </div>
+                    <div class="flex-1">
+                        <p><strong><i class="fas fa-users"></i> Students:</strong> <span id="studentCount">0</span></p>
+                        <p><strong><i class="fas fa-calendar-week"></i> Detected Weeks:</strong> <span id="weekCount">None</span></p>
+                    </div>
                 </div>
+            </div>
         </div>
 
         <!-- Create Session Section -->
         <div class="card">
-            <h2><i class="fas fa-plus-circle"></i> Create Attendance Session</h2>
+            <h2><i class="fas fa-play-circle"></i> Create Attendance Session</h2>
             <form id="sessionForm">
                 <div class="flex gap-4">
                     <div class="form-group flex-1">
-                        <label for="week">
-                            <i class="fas fa-calendar-week"></i> Week Number
-                        </label>
-                        <input type="number" id="week" min="1" required>
-                    </div>
-                    <div class="form-group flex-1">
-                        <label for="max_attendees">
-                            <i class="fas fa-users"></i> Max Attendees
-                        </label>
-                        <input type="number" id="max_attendees" min="1" value="30" required>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="ta_email">
-                        <i class="fas fa-envelope"></i> Outlook Email (Optional)
-                    </label>
-                    <input type="email" id="ta_email" placeholder="your.email@outlook.com">
-                </div>
-                
-                <div class="form-group">
-                    <label class="flex gap-4">
-                            <input type="checkbox" id="useLocation">
-                        <span><i class="fas fa-map-marker-alt"></i> Enable Location Verification</span>
-                        </label>
-                </div>
-                
-                <div id="locationSettings" class="hidden">
-            <div class="flex gap-4">
-                        <div class="form-group flex-1">
-                            <label for="savedLocations">
-                                <i class="fas fa-map-marked-alt"></i> Saved Locations
-                            </label>
-                            <select id="savedLocations" required>
-                                <option value="">Select a saved location</option>
-                            </select>
-            </div>
-                        <div class="form-group flex-1">
-                            <label for="locationDistance">
-                                <i class="fas fa-ruler"></i> Max Distance (meters)
-                            </label>
-                            <input type="number" id="locationDistance" value="50" min="10" max="1000">
-        </div>
-    </div>
-                    <button type="button" id="scanLocationBtn" class="btn btn-secondary">
-                        <i class="fas fa-qrcode"></i> Scan New Location
-                        </button>
+                        <label for="week"><i class="fas fa-calendar-week"></i> Week Number</label>
+                        <input type="number" id="week" name="week" min="1" max="52" placeholder="e.g., 1" required>
                     </div>
                     
+                    <div class="form-group flex-1">
+                        <label for="max_attendees"><i class="fas fa-user-friends"></i> Max Attendees</label>
+                        <input type="number" id="max_attendees" name="max_attendees" min="1" max="500" value="30" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password"><i class="fas fa-shield-alt"></i> Session Password (Optional)</label>
+                    <input type="password" id="password" name="password" placeholder="Leave blank for no password">
+                </div>
+                
+                <div class="form-group">
+                    <label for="ta_email"><i class="fas fa-envelope"></i> Your Outlook Email</label>
+                    <input type="email" id="ta_email" name="ta_email" placeholder="Enter your Outlook email" required>
+                </div>
+                
+                <!-- Location Settings -->
+                <div class="form-group">
+                    <label style="display: flex; align-items: center;">
+                        <i class="fas fa-map-marker-alt"></i> Enable Location Check
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="useLocation">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <button type="button" id="setLocationBtn" class="btn btn-secondary location-btn" style="display: none;">
+                            <i class="fas fa-qrcode"></i> Scan QR for Location
+                        </button>
+                    </label>
+                    <div id="locationSettings" class="hidden">
+                        <label for="locationDistance">Maximum Distance (meters):</label>
+                        <input type="number" id="locationDistance" value="50" min="10">
+                        <div id="locationPreview" style="margin-top: 0.5rem; font-size: 0.9rem; color: #6b7280;">
+                            No location selected
+                        </div>
+                    </div>
+                </div>
+                
                 <button type="submit" id="createSessionBtn" class="btn" disabled>
-                    <i class="fas fa-plus-circle"></i> Create Session
-                            </button>
+                    <i class="fas fa-rocket"></i> Launch Session
+                </button>
             </form>
+        </div>
+
+        <!-- Sessions Container -->
+        <div id="sessionsContainer"></div>
+
+        <!-- Session History Section -->
+        <div class="card session-history hidden" id="sessionHistoryCard">
+            <h2><i class="fas fa-history"></i> Session History</h2>
+            <div id="sessionHistoryList"></div>
+            <button onclick="attendanceApp.clearSessionHistory()" class="btn btn-danger">
+                <i class="fas fa-trash"></i> Clear History
+            </button>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div id="qrModal" class="qr-modal">
+        <div class="qr-modal-content">
+            <div id="fullscreenQr"></div>
+            <button onclick="attendanceApp.closeFullscreenQR()" class="btn close-modal">
+                <i class="fas fa-times"></i> Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Location Picker Modal -->
+    <div id="locationQRModal" class="modal hidden">
+        <div class="modal-content">
+            <h2><i class="fas fa-qrcode"></i> Set Location via Mobile</h2>
+            <p class="text-center mb-4">Scan this QR code with your mobile device to set the class location</p>
+            
+            <div id="locationQRCode" class="text-center"></div>
+            
+            <div id="locationStatus" class="alert alert-info mt-4">
+                <div id="locationPreview">Waiting for location from mobile device...</div>
+                <div class="spinner mt-2"></div>
+            </div>
+            
+            <div class="flex gap-4 mt-4">
+                <button onclick="attendanceApp.closeLocationModal()" class="btn btn-danger">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voice Command Button -->
+    <div class="voice-btn" id="voiceBtn" title="Voice Commands">
+        <i class="fas fa-microphone"></i>
+    </div>
+
+    <script>
+        const attendanceApp = {
+            rosterData: [],
+            currentSessions: [],
+            subjectName: '',
+            previousAttendanceData: null,
+            sessionsHistory: [],
+            recognition: null,
+            deviceId: localStorage.getItem('deviceId') || Date.now().toString(),
+            existingWeeks: [],
+            maxExistingWeek: 0,
+            classLocation: null,
+            map: null,
+            marker: null,
+            selectedLocation: null,
+
+            init: function() {
+                localStorage.setItem('deviceId', this.deviceId);
+                this.setupDragAndDrop();
+                
+                const locationToggle = document.getElementById('useLocation');
+                locationToggle.addEventListener('change', function() {
+                    document.getElementById('locationSettings').classList.toggle('hidden', !this.checked);
+                    document.getElementById('setLocationBtn').style.display = this.checked ? 'block' : 'none';
+                });
+                
+                document.getElementById('setLocationBtn').addEventListener('click', () => {
+                    this.openLocationModal();
+                });
+
+                // Set up automatic file processing
+                const rosterInput = document.getElementById('roster');
+                rosterInput.addEventListener('change', (e) => this.handleFileSelection(e));
+                
+                this.initVoiceCommands();
+                this.loadSessionHistory();
+                this.initializeApp();
+
+                // Clean up when page is closed
+                window.addEventListener('beforeunload', () => {
+                    this.cleanup();
+                });
+            },
+
+            handleFileSelection: function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const fileNameSpan = document.getElementById('fileName');
+                fileNameSpan.textContent = file.name;
+                
+                // Auto-fill subject name
+                const subjectFromFile = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
+                document.getElementById('subjectNameInput').value = subjectFromFile;
+                
+                // Automatically process the file
+                this.processRosterFile(file);
+            },
+
+            processRosterFile: function(file) {
+                const reader = new FileReader();
+                const rosterInfoDiv = document.getElementById('rosterInfo');
+                const studentCountSpan = document.getElementById('studentCount');
+                const weekCountSpan = document.getElementById('weekCount');
+                const createSessionBtn = document.getElementById('createSessionBtn');
+                
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                        
+                        const weekColumns = {};
+                        let maxWeek = 0;
+                        
+                        if (jsonData.length > 0) {
+                            Object.keys(jsonData[0]).forEach(key => {
+                                const lowerKey = key.toLowerCase();
+                                if (lowerKey.includes('timestamp')) return;
+
+                                const match = key.match(/week[\s_]?(\d+)/i);
+                                if (match) {
+                                    const weekNum = parseInt(match[1]);
+                                    if (!isNaN(weekNum)) {
+                                        weekColumns[weekNum] = key;
+                                        if (weekNum > maxWeek) maxWeek = weekNum;
+                                    }
+                                }
+                            });
+                        }
+                        
+                        this.rosterData = jsonData.map(row => {
+                            const id = String(row['Student ID'] || row['ID'] || row['id'] || row['StudentID'] || row['student_id'] || '').trim();
+                            const name = (row['Name'] || row['Student Name'] || row['name'] || row['StudentName'] || row['student_name'] || '').trim();
+                            const section = (row['Section'] || row['Class'] || row['section'] || row['class'] || '').trim();
+                            
+                            const weekData = {};
+                            Object.keys(weekColumns).forEach(weekNum => {
+                                const rawValue = row[weekColumns[weekNum]];
+                                const cleaned = String(rawValue || '').trim().toLowerCase();
+                                const presentValues = ['1', 'yes', '✓', 'present', 'x'];
+                                weekData[weekNum] = presentValues.includes(cleaned) ? 1 : 0;
+                                if (rawValue && typeof rawValue === 'string' && (rawValue.includes('/') || rawValue.includes(':'))) {
+                                    row[`Timestamp Week ${weekNum}`] = rawValue;
+                                }
+                            });
+                            
+                            return { id, name, section, weekData, ...row };
+                        }).filter(student => student.id && student.name);
+                        
+                        if (this.rosterData.length === 0) {
+                            this.showMessage('No valid student data found. Please check your file format.', 'danger');
+                            return;
+                        }
+                        
+                        this.subjectName = document.getElementById('subjectNameInput').value;
+                        this.existingWeeks = Object.keys(weekColumns).map(Number).sort((a, b) => a - b);
+                        this.maxExistingWeek = maxWeek;
+                        
+                        studentCountSpan.textContent = this.rosterData.length;
+                        weekCountSpan.textContent = this.existingWeeks.length > 0 ? 
+                            this.existingWeeks.join(', ') : 'None (New Session)';
+                        rosterInfoDiv.classList.remove('hidden');
+                        createSessionBtn.disabled = false;
+                        
+                        this.showMessage('Roster uploaded successfully!', 'success');
+                    } catch (error) {
+                        console.error(error);
+                        this.showMessage('Error processing file. Please check the format.', 'danger');
+                    }
+                };
+                
+                reader.onerror = () => {
+                    this.showMessage('Error reading file', 'danger');
+                };
+                
+                reader.readAsArrayBuffer(file);
+            },
+
+            cleanup: function() {
+                console.log('Cleaning up resources...');
+                // Clean up all active session listeners
+                this.currentSessions.forEach(session => {
+                    if (session.attendeesRef) {
+                        window.dbOff(session.attendeesRef);
+                    }
+                    if (session.tokensRef) {
+                        window.dbOff(session.tokensRef);
+                    }
+                    if (session.sessionRef) {
+                        window.dbOff(session.sessionRef);
+                    }
+                });
+
+                // Clean up location listener if active
+                if (this.locationRef) {
+                    window.dbOff(this.locationRef);
+                    this.locationRef = null;
+                }
+            },
+
+            setupDragAndDrop: function() {
+                const fileUpload = document.querySelector('.file-upload');
+                const fileInput = document.getElementById('roster');
+                const fileNameSpan = document.getElementById('fileName');
+
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    fileUpload.addEventListener(eventName, preventDefaults, false);
+                });
+
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    fileUpload.addEventListener(eventName, highlight, false);
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    fileUpload.addEventListener(eventName, unhighlight, false);
+                });
+
+                function highlight() {
+                    fileUpload.classList.add('bg-blue-50');
+                    fileUpload.style.borderColor = 'var(--primary)';
+                }
+
+                function unhighlight() {
+                    fileUpload.classList.remove('bg-blue-50');
+                    fileUpload.style.borderColor = '#d1d5db';
+                }
+
+                fileUpload.addEventListener('drop', handleDrop, false);
+
+                function handleDrop(e) {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    
+                    if (files.length) {
+                        fileInput.files = files;
+                        fileNameSpan.textContent = files[0].name;
+                        
+                        const fileName = files[0].name;
+                        const subjectFromFile = fileName.replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
+                        document.getElementById('subjectNameInput').value = subjectFromFile;
+                    }
+                }
+            },
+
+            initializeApp: function() {
+                const rosterInput = document.getElementById('roster');
+                const fileNameSpan = document.getElementById('fileName');
+                const uploadForm = document.getElementById('uploadForm');
+                const rosterInfoDiv = document.getElementById('rosterInfo');
+                const studentCountSpan = document.getElementById('studentCount');
+                const weekCountSpan = document.getElementById('weekCount');
+                const sessionForm = document.getElementById('sessionForm');
+                const createSessionBtn = document.getElementById('createSessionBtn');
+                
+                rosterInput.addEventListener('change', function(e) {
+                    if (this.files.length > 0) {
+                        const file = this.files[0];
+                        fileNameSpan.textContent = file.name;
+                        
+                        const subjectFromFile = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
+                        document.getElementById('subjectNameInput').value = subjectFromFile;
+                    } else {
+                        fileNameSpan.textContent = 'No file chosen';
+                    }
+                });
+                
+                uploadForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    if (rosterInput.files.length === 0) {
+                        attendanceApp.showMessage('Please select a file first', 'danger');
+                        return;
+                    }
+                    
+                    const file = rosterInput.files[0];
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                            
+                            const weekColumns = {};
+                            let maxWeek = 0;
+                            
+                            if (jsonData.length > 0) {
+                                Object.keys(jsonData[0]).forEach(key => {
+                                    const lowerKey = key.toLowerCase();
+                                    if (lowerKey.includes('timestamp')) return;
+
+                                    const match = key.match(/week[\s_]?(\d+)/i);
+                                    if (match) {
+                                        const weekNum = parseInt(match[1]);
+                                        if (!isNaN(weekNum)) {
+                                            weekColumns[weekNum] = key;
+                                            if (weekNum > maxWeek) maxWeek = weekNum;
+                                        }
+                                    }
+                                });
+                            }
+                            
+                            attendanceApp.rosterData = jsonData.map(row => {
+                                const id = String(row['Student ID'] || row['ID'] || row['id'] || row['StudentID'] || row['student_id'] || '').trim();
+                                const name = (row['Name'] || row['Student Name'] || row['name'] || row['StudentName'] || row['student_name'] || '').trim();
+                                const section = (row['Section'] || row['Class'] || row['section'] || row['class'] || '').trim();
+                                
+                                const weekData = {};
+                                Object.keys(weekColumns).forEach(weekNum => {
+                                    const rawValue = row[weekColumns[weekNum]];
+                                    const cleaned = String(rawValue || '').trim().toLowerCase();
+                                    const presentValues = ['1', 'yes', '✓', 'present', 'x'];
+                                    weekData[weekNum] = presentValues.includes(cleaned) ? 1 : 0;
+                                    if (rawValue && typeof rawValue === 'string' && (rawValue.includes('/') || rawValue.includes(':'))) {
+                                        row[`Timestamp Week ${weekNum}`] = rawValue;
+                                    }
+                                });
+                                
+                                return { id, name, section, weekData, ...row };
+                            }).filter(student => student.id && student.name);
+                            
+                            if (attendanceApp.rosterData.length === 0) {
+                                attendanceApp.showMessage('No valid student data found. Please check your file format.', 'danger');
+                                return;
+                            }
+                            
+                            attendanceApp.subjectName = document.getElementById('subjectNameInput').value || 
+                                             file.name.replace(/\.(xlsx|csv)$/i, '').replace(/_/g, ' ');
+                            
+                            attendanceApp.existingWeeks = Object.keys(weekColumns).map(Number).sort((a, b) => a - b);
+                            attendanceApp.maxExistingWeek = maxWeek;
+                            
+                            studentCountSpan.textContent = attendanceApp.rosterData.length;
+                            weekCountSpan.textContent = attendanceApp.existingWeeks.length > 0 ? 
+                                attendanceApp.existingWeeks.join(', ') : 'None (New Session)';
+                            rosterInfoDiv.classList.remove('hidden');
+                            createSessionBtn.disabled = false;
+                            
+                            attendanceApp.showMessage('Roster uploaded successfully!', 'success');
+                        } catch (error) {
+                            console.error(error);
+                            attendanceApp.showMessage('Error processing file. Please check the format.', 'danger');
+                        }
+                    };
+                    
+                    reader.onerror = function() {
+                        attendanceApp.showMessage('Error reading file', 'danger');
+                    };
+                    
+                    reader.readAsArrayBuffer(file);
+                });
+                
+                sessionForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const week = document.getElementById('week').value;
+                    const password = document.getElementById('password').value || null;
+                    const maxAttendees = parseInt(document.getElementById('max_attendees').value);
+                    const taEmail = document.getElementById('ta_email').value;
+                    const useLocation = document.getElementById('useLocation').checked;
+                    const locationDistance = document.getElementById('locationDistance').value || 50;
+                    
+                    if (!attendanceApp.subjectName || !week || !maxAttendees || !taEmail) {
+                        attendanceApp.showMessage('Please upload roster and fill required fields', 'danger');
+                        return;
+                    }
+                    
+                    document.getElementById('sessionsContainer').innerHTML = '';
+                    
+                    const finalizeSession = async () => {
+                        try {
+                            const sessionId = 'session_' + Date.now();
+                            
+                            // Save TA's IP for blocking
+                            const taIP = await fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => data.ip).catch(() => 'unknown');
+
+                            // Generate one token per student
+                            const tokenList = {};
+                            attendanceApp.rosterData.forEach(student => {
+                                const token = crypto.randomUUID();
+                                tokenList[token] = {
+                                    id: student.id,
+                                    name: student.name,
+                                    issuedToDevice: null,
+                                    issuedToIP: null,
+                                    used: false,
+                                    flagged: false,
+                                    issuedAt: Date.now()
+                                };
+                            });
+
+                            const newSession = {
+                                id: sessionId,
+                                subject: attendanceApp.subjectName,
+                                week,
+                                password,
+                                maxAttendees,
+                                roster: attendanceApp.rosterData,
+                                taEmail,
+                                createdAt: window.dbServerTimestamp(),
+                                active: true,
+                                attendeeCount: 0,
+                                useLocation,
+                                locationDistance,
+                                deviceId: attendanceApp.deviceId,
+                                existingWeeks: [...attendanceApp.existingWeeks],
+                                maxExistingWeek: attendanceApp.maxExistingWeek,
+                                taIP
+                            };
+                            
+                            if (useLocation && attendanceApp.classLocation) {
+                                newSession.classLocation = attendanceApp.classLocation;
+                            }
+                            
+                            try {
+                                const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
+                                await window.dbSet(sessionRef, newSession);
+                                
+                                // Save tokens to database
+                                await window.dbSet(window.dbRef(window.database, `sessions/${sessionId}/tokens`), tokenList);
+                                
+                                attendanceApp.saveSessionToLocal(newSession);
+                                
+                                const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
+                                const tokensRef = window.dbRef(window.database, `sessions/${sessionId}/tokens`);
+                                
+                                const sessionData = {
+                                    ...newSession,
+                                    sessionRef,
+                                    attendeesRef,
+                                    tokensRef,
+                                    syncStatus: 'connecting'
+                                };
+                                
+                                attendanceApp.currentSessions.push(sessionData);
+                                attendanceApp.displaySession(sessionData);
+                                
+                                window.dbOnValue(attendeesRef, (snapshot) => {
+                                    const attendees = snapshot.val() || {};
+                                    const attendeeList = Object.values(attendees);
+                                    sessionData.attendees = attendeeList;
+                                    sessionData.attendeeCount = attendeeList.length;
+                                    
+                                    attendanceApp.updateSessionDisplay(sessionData);
+                                    
+                                    if (attendeeList.length >= maxAttendees && sessionData.active) {
+                                        attendanceApp.endSession(sessionData.id);
+                                    }
+                                    
+                                    attendanceApp.saveSessionToLocal(sessionData);
+                                });
+                                
+                                attendanceApp.showMessage('Attendance session started successfully!', 'success');
+                                attendanceApp.addToSessionHistory(sessionData);
+                                document.getElementById('sessionHistoryCard').classList.remove('hidden');
+                                
+                            } catch (error) {
+                                console.error('Error creating session:', error);
+                                attendanceApp.showMessage('Failed to create session. Please try again.', 'danger');
+                            }
+                        } catch (error) {
+                            console.error('Error:', error);
+                        }
+                    };
+
+                    if (useLocation && !attendanceApp.classLocation && navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(pos => {
+                            attendanceApp.classLocation = {
+                                lat: pos.coords.latitude,
+                                lng: pos.coords.longitude,
+                                accuracy: pos.coords.accuracy
+                            };
+                            finalizeSession();
+                        }, err => {
+                            console.error('Location error:', err);
+                            attendanceApp.showMessage('Location access denied. Session will start without location verification.', 'warning');
+                            finalizeSession();
+                        }, { enableHighAccuracy: true, timeout: 10000 });
+                    } else {
+                        finalizeSession();
+                    }
+                });
+            },
+
+            displaySession: function(sessionData) {
+                const sessionsContainer = document.getElementById('sessionsContainer');
+                const sessionId = sessionData.id;
+                
+                // Clean up any existing session with the same ID
+                const existingSession = this.currentSessions.find(s => s.id === sessionId);
+                if (existingSession) {
+                    if (existingSession.attendeesRef) window.dbOff(existingSession.attendeesRef);
+                    if (existingSession.tokensRef) window.dbOff(existingSession.tokensRef);
+                    if (existingSession.sessionRef) window.dbOff(existingSession.sessionRef);
+                    this.currentSessions = this.currentSessions.filter(s => s.id !== sessionId);
+                }
+                
+                const sessionCard = document.createElement('div');
+                sessionCard.className = 'card session-card';
+                sessionCard.id = `sessionCard_${sessionId}`;
+                sessionCard.innerHTML = `
+                    <div class="session-status session-active" id="sessionStatus_${sessionId}">
+                        <i class="fas fa-broadcast-tower"></i> 
+                        <span>Session Active & Live</span>
+                        <div class="sync-status">
+                            <div class="sync-indicator" id="syncIndicator_${sessionId}"></div>
+                            <span id="syncStatus_${sessionId}">Connecting...</span>
+                        </div>
+                    </div>
+                    
+                    <h2><i class="fas fa-users-cog"></i> Live Session Dashboard</h2>
+                    
+                    <div class="flex gap-4 mb-4">
+                        <div class="flex-1">
+                            <label><strong><i class="fas fa-graduation-cap"></i> Subject:</strong></label>
+                            <p id="currentSubject_${sessionId}">${sessionData.subject}</p>
+                        </div>
+                        <div class="flex-1">
+                            <label><strong><i class="fas fa-calendar"></i> Week:</strong></label>
+                            <p id="currentWeek_${sessionId}">${sessionData.week}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill_${sessionId}" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span><strong>Attendance Progress</strong></span>
+                            <span><span id="attendedCount_${sessionId}">0</span> / <span id="maxAttendeesDisplay_${sessionId}">${sessionData.maxAttendees}</span> Students</span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mb-4">
+                        <div id="qrcode_${sessionId}"></div>
+                        <button onclick="attendanceApp.openFullscreenQR('${sessionId}')" class="btn btn-secondary mt-2">
+                            <i class="fas fa-expand"></i> Fullscreen QR
+                        </button>
+                        <p style="color: #6b7280; margin-top: 1rem;">Students can scan this QR code to mark attendance</p>
+                    </div>
+                    
+                    <div class="form-group session-url">
+                        <label><strong><i class="fas fa-link"></i> Student Access Link:</strong></label>
+                        <div class="input-group">
+                            <input type="text" id="sessionUrl_${sessionId}" readonly>
+                            <button type="button" class="btn btn-secondary copy-btn" onclick="attendanceApp.copyToClipboard('${sessionId}')">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
                     </div>
 
-        <!-- QR Code Section -->
-        <div id="qrCode" class="card hidden">
-            <h2><i class="fas fa-qrcode"></i> Session QR Code</h2>
-            <div class="text-center">
-                <!-- QR code will be inserted here -->
+                    <div class="form-group">
+                        <label><strong><i class="fas fa-clock"></i> Live Attendance Feed:</strong></label>
+                        <div id="attendanceList_${sessionId}" class="attendance-list">
+                            <div style="padding: 2rem; text-align: center; color: #6b7280;">
+                                <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                                <p>Waiting for students to join...</p>
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="flex gap-4 mt-4">
+                        <button onclick="attendanceApp.exportAttendanceReport('${sessionId}')" class="btn btn-success flex-1">
+                            <i class="fas fa-download"></i> Export Report
+                        </button>
+                        
+                        <button onclick="attendanceApp.endSession('${sessionId}')" class="btn btn-danger flex-1">
+                            <i class="fas fa-stop-circle"></i> End Session
+                        </button>
+                    </div>
+                `;
+                
+                sessionsContainer.appendChild(sessionCard);
+                
+                const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
+                const qr = qrcode(0, 'L');
+                qr.addData(formUrl);
+                qr.make();
+                document.getElementById(`qrcode_${sessionId}`).innerHTML = qr.createImgTag(5);
+                document.getElementById(`sessionUrl_${sessionId}`).value = formUrl;
+            },
+
+            showStudentQRCodes: function(sessionId) {
+                const session = this.currentSessions.find(s => s.id === sessionId);
+                if (!session || !session.sessionData) return;
+
+                const modal = document.createElement('div');
+                modal.className = 'modal';
+                modal.id = 'studentQRModal';
+                modal.innerHTML = `
+                    <div class="modal-content">
+                        <h2><i class="fas fa-qrcode"></i> Student QR Codes</h2>
+                        <div id="studentQRList" class="student-qr-list">
+                            <div class="spinner"></div>
+                            <p>Generating QR codes...</p>
+                        </div>
+                        <button onclick="document.getElementById('studentQRModal').remove()" class="btn btn-danger mt-4">
+                            <i class="fas fa-times"></i> Close
+                        </button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+
+                // Get tokens for the session
+                const tokensRef = window.dbRef(window.database, `sessions/${sessionId}/tokens`);
+                window.dbGet(tokensRef).then(snapshot => {
+                    const tokens = snapshot.val() || {};
+                    const studentQRList = document.getElementById('studentQRList');
+                    const studentLinks = document.getElementById(`studentLinks_${sessionId}`);
+                    
+                    let qrHtml = '';
+                    let linksHtml = '<div class="student-links-grid">';
+                    
+                    Object.entries(tokens).forEach(([token, data]) => {
+                        const formUrl = `${window.location.origin}/form.html?session=${sessionId}&token=${token}`;
+                const qr = qrcode(0, 'L');
+                        qr.addData(formUrl);
+                qr.make();
+                        
+                        qrHtml += `
+                            <div class="student-qr-item">
+                                <div class="student-info">
+                                    <strong>${data.name}</strong>
+                                    <span>ID: ${data.id}</span>
+                                </div>
+                                ${qr.createImgTag(5)}
+                                <button onclick="navigator.clipboard.writeText('${formUrl}').then(() => attendanceApp.showMessage('Link copied!', 'success'))" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-copy"></i> Copy Link
+                                </button>
+                            </div>
+                        `;
+                        
+                        linksHtml += `
+                            <div class="student-link-item">
+                                <div class="student-info">
+                                    <strong>${data.name}</strong>
+                                    <span>ID: ${data.id}</span>
+                                </div>
+                                <div class="link-actions">
+                                    <input type="text" value="${formUrl}" readonly>
+                                    <button onclick="navigator.clipboard.writeText('${formUrl}').then(() => attendanceApp.showMessage('Link copied!', 'success'))" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    linksHtml += '</div>';
+                    studentQRList.innerHTML = qrHtml;
+                    studentLinks.innerHTML = linksHtml;
+                });
+            },
+
+            updateSessionDisplay: function(sessionData) {
+                const sessionId = sessionData.id;
+                document.getElementById(`attendedCount_${sessionId}`).textContent = sessionData.attendeeCount || 0;
+                document.getElementById(`progressFill_${sessionId}`).style.width = 
+                    `${(sessionData.attendeeCount / sessionData.maxAttendees) * 100}%`;
+                
+                this.updateAttendanceList(sessionData);
+            },
+
+            updateAttendanceList: function(sessionData) {
+                const sessionId = sessionData.id;
+                const attendanceListDiv = document.getElementById(`attendanceList_${sessionId}`);
+                const attendees = sessionData.attendees || [];
+                
+                if (!attendees || attendees.length === 0) {
+                    attendanceListDiv.innerHTML = `
+                        <div style="padding: 2rem; text-align: center; color: #6b7280;">
+                            <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                            <p>Waiting for students to join...</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Build map of IPs to IDs
+                const ipMap = {};
+                attendees.forEach(a => {
+                    if (!a.ip) return;
+                    if (!ipMap[a.ip]) ipMap[a.ip] = [];
+                    ipMap[a.ip].push(a.id);
+                });
+                
+                const attendeesHtml = attendees
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                    .map(attendee => {
+                        let ipNote = '';
+                        const others = ipMap[attendee.ip]?.filter(id => id !== attendee.id);
+                        if (others?.length > 0) {
+                            ipNote = `<span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Same IP with ${others.join(', ')}</span>`;
+                        }
+
+                        return `
+                            <div class="attendee-item">
+                                <div class="attendee-info">
+                                    <span class="attendee-name">${attendee.name}</span>
+                                    <span class="attendee-details">
+                                        ID: ${attendee.id} | Section: ${attendee.section} <br>
+                                        ${ipNote}
+                                    </span>
+                                </div>
+                                <div class="attendee-time">
+                                    ${new Date(attendee.timestamp).toLocaleTimeString()}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                
+                attendanceListDiv.innerHTML = attendeesHtml;
+            },
+
+            exportAttendanceReport: async function(sessionId) {
+                const session = this.currentSessions.find(s => s.id === sessionId) || 
+                              JSON.parse(localStorage.getItem('sessions'))?.[sessionId];
+                
+                if (!session) {
+                    this.showMessage('Session not found or already ended', 'danger');
+                    return;
+                }
+                
+                const roster = session.roster || [];
+                const attendees = session.attendees || [];
+                const currentWeek = parseInt(session.week);
+                const subjectName = session.subject;
+                const allWeeks = [...(session.existingWeeks || []), currentWeek].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
+                
+                // Get token data
+                const tokensSnap = await window.dbGet(window.dbRef(window.database, `sessions/${sessionId}/tokens`));
+                const tokenMap = tokensSnap.val() || {};
+                
+                // Token flags
+                const tokenNotes = {};
+                Object.entries(tokenMap).forEach(([token, data]) => {
+                    if (data.flagged && data.secondStudentId) {
+                        tokenNotes[data.id] = `Same token with ${data.secondStudentId}`;
+                        tokenNotes[data.secondStudentId] = `Same token with ${data.id}`;
+                    }
+                });
+
+                // IP flags
+                const ipMap = {};
+                attendees.forEach(a => {
+                    if (!a.ip) return;
+                    if (!ipMap[a.ip]) ipMap[a.ip] = [];
+                    ipMap[a.ip].push(a.id);
+                });
+
+                const ipNotes = {};
+                Object.entries(ipMap).forEach(([ip, ids]) => {
+                    if (ids.length > 1) {
+                        ids.forEach(id => {
+                            ipNotes[id] = `Same IP with ${ids.filter(x => x !== id).join(', ')}`;
+                        });
+                    }
+                });
+
+                // Final report data
+                const reportData = [];
+                
+                if (session.existingWeeks?.length > 0) {
+                    roster.forEach(student => {
+                        const matched = attendees.find(a => a.id === student.id);
+                        const row = {
+                            'Student ID': student.id,
+                            'Name': student.name,
+                            'Section': student.section || ''
+                        };
+                        
+                        allWeeks.forEach(week => {
+                            if (week === currentWeek) {
+                                row[`Week ${week}`] = matched ? 1 : 0;
+                                row[`Timestamp Week ${week}`] = matched ? 
+                                    new Date(matched.timestamp).toLocaleString() : 'N/A';
+                            } else {
+                                row[`Week ${week}`] = student.weekData?.[week] || 0;
+                                row[`Timestamp Week ${week}`] = student[`Timestamp Week ${week}`] || 'N/A';
+                            }
+                        });
+                        
+                        row['Total Attendance'] = allWeeks.reduce((sum, week) => {
+                            return sum + (Number(row[`Week ${week}`]) || 0);
+                        }, 0);
+
+                        // Add IP note if applicable
+                        const ipNote = ipNotes[student.id] || '';
+                            
+                        // Add token note if applicable
+                        const tokenNote = tokenNotes[student.id] || '';
+                        
+                        // Combine notes
+                        row['Note'] = [ipNote, tokenNote].filter(Boolean).join(' | ');
+                        
+                        // Add flagged column if token was misused
+                        row['Flagged'] = tokenNote ? 'Yes' : '';
+                        
+                        reportData.push(row);
+                    });
+                } else {
+                    roster.forEach(student => {
+                        const matched = attendees.find(a => a.id === student.id);
+                        const row = {
+                            'Student ID': student.id,
+                            'Name': student.name,
+                            'Section': student.section || '',
+                            [`Week ${currentWeek}`]: matched ? 1 : 0,
+                            'Total Attendance': matched ? 1 : 0,
+                            [`Timestamp Week ${currentWeek}`]: matched ? 
+                                new Date(matched.timestamp).toLocaleString() : 'N/A'
+                        };
+
+                        // Add IP note if applicable
+                        const ipNote = ipNotes[student.id] || '';
+                            
+                        // Add token note if applicable
+                        const tokenNote = tokenNotes[student.id] || '';
+                        
+                        // Combine notes
+                        row['Note'] = [ipNote, tokenNote].filter(Boolean).join(' | ');
+                        
+                        // Add flagged column if token was misused
+                        row['Flagged'] = tokenNote ? 'Yes' : '';
+                        
+                        reportData.push(row);
+                    });
+                }
+                
+                // Add flagged submissions at the end
+                attendees.filter(a => a.flagged).forEach(flagged => {
+                    if (!reportData.some(r => r['Student ID'] === flagged.id)) {
+                        reportData.push({
+                            'Student ID': flagged.id,
+                            'Name': flagged.name || 'Flagged Submission',
+                            'Section': flagged.section || '',
+                            [`Week ${currentWeek}`]: 0,
+                            'Total Attendance': 0,
+                            [`Timestamp Week ${currentWeek}`]: new Date(flagged.timestamp).toLocaleString(),
+                            'Note': flagged.note || 'Flagged submission',
+                            'Flagged': 'Yes'
+                        });
+                    }
+                });
+                
+                const columnOrder = ['Student ID', 'Name', 'Section'];
+                
+                allWeeks.forEach(week => {
+                    columnOrder.push(`Week ${week}`);
+                });
+                
+                columnOrder.push('Total Attendance');
+                
+                allWeeks.forEach(week => {
+                    columnOrder.push(`Timestamp Week ${week}`);
+                });
+
+                // Add Note and Flagged columns
+                columnOrder.push('Note');
+                columnOrder.push('Flagged');
+                
+                const reorderedData = reportData.map(row => {
+                    const newRow = {};
+                    columnOrder.forEach(col => {
+                        if (row[col] !== undefined) {
+                            newRow[col] = row[col];
+                        }
+                    });
+                    return newRow;
+                });
+                
+                const ws = XLSX.utils.json_to_sheet(reorderedData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+                
+                const today = new Date();
+                const dateStr = today.toISOString().split('T')[0];
+                let fileName;
+                
+                if (allWeeks.length > 1) {
+                    fileName = `${subjectName} Attendance from Week ${Math.min(...allWeeks)} to ${Math.max(...allWeeks)} ${dateStr}.xlsx`;
+                } else {
+                    fileName = `${subjectName} Attendance for Week ${currentWeek} ${dateStr}.xlsx`;
+                }
+                
+                fileName = fileName.replace(/[^a-zA-Z0-9\s\.\-_]/g, '').replace(/\s+/g, ' ');
+                XLSX.writeFile(wb, fileName);
+            },
+
+            endSession: async function(sessionId) {
+                try {
+                    // Clean up listeners first
+                    const session = this.currentSessions.find(s => s.id === sessionId);
+                    if (session) {
+                        if (session.attendeesRef) window.dbOff(session.attendeesRef);
+                        if (session.tokensRef) window.dbOff(session.tokensRef);
+                        if (session.sessionRef) window.dbOff(session.sessionRef);
+                        this.currentSessions = this.currentSessions.filter(s => s.id !== sessionId);
+                    }
+
+                    // Update session status in Firebase
+                    const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
+                    await window.dbSet(sessionRef, { 
+                        ...session,
+                        active: false,
+                        endedAt: Date.now()
+                    });
+
+                    this.showMessage('Session ended successfully.', 'success');
+
+                    // Update UI
+                    const sessionCard = document.getElementById(`sessionCard_${sessionId}`);
+                    if (sessionCard) {
+                        sessionCard.innerHTML = `
+                            <div class="session-status session-inactive">
+                                <i class="fas fa-calendar-times"></i>
+                                <span>Session Ended</span>
+                            </div>
+
+                            <div class="session-feedback">
+                                <h2><i class="fas fa-check-circle"></i> Session Ended</h2>
+                                <p>This attendance session has ended.</p>
+                                <p>You can export the attendance report below.</p>
+
+                                <button onclick="attendanceApp.exportAttendanceReport('${sessionId}')" class="btn btn-success mt-3">
+                                    <i class="fas fa-download"></i> Export Final Report
+                                </button>
+                            </div>
+                        `;
+                    }
+
+                    // Update session in history
+                    const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
+                    const sessionIndex = history.findIndex(s => s.id === sessionId);
+                    if (sessionIndex !== -1) {
+                        history[sessionIndex].active = false;
+                        localStorage.setItem('sessionHistory', JSON.stringify(history));
+                        this.renderSessionHistory();
+                    }
+
+                    this.clearSessionInputs();
+                } catch (error) {
+                    console.error('Error ending session:', error);
+                    this.showMessage('Failed to end session. Please try again.', 'danger');
+                }
+            },
+
+            clearSessionInputs: function() {
+                const rosterInput = document.getElementById('roster');
+                const fileNameSpan = document.getElementById('fileName');
+                const subjectInput = document.getElementById('subjectNameInput');
+                const weekInput = document.getElementById('week');
+                const maxAttendeesInput = document.getElementById('max_attendees');
+                const passwordInput = document.getElementById('password');
+                const emailInput = document.getElementById('ta_email');
+
+                rosterInput.value = '';
+                fileNameSpan.textContent = 'Drag & drop or click to browse files';
+                subjectInput.value = '';
+                weekInput.value = '';
+                maxAttendeesInput.value = 30;
+                passwordInput.value = '';
+                emailInput.value = '';
+                document.getElementById('rosterInfo').classList.add('hidden');
+                document.getElementById('createSessionBtn').disabled = true;
+                this.rosterData = [];
+            },
+
+            openFullscreenQR: function(sessionId) {
+                const modal = document.getElementById('qrModal');
+                const qrContainer = document.getElementById('fullscreenQr');
+                
+                const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
+                const qr = qrcode(0, 'L');
+                qr.addData(formUrl);
+                qr.make();
+                
+                qrContainer.innerHTML = qr.createImgTag(10);
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            },
+
+            closeFullscreenQR: function() {
+                document.getElementById('qrModal').style.display = 'none';
+                document.body.style.overflow = 'auto';
+            },
+
+            copyToClipboard: function(sessionId) {
+                const urlInput = document.getElementById(`sessionUrl_${sessionId}`);
+                urlInput.select();
+                urlInput.setSelectionRange(0, 99999);
+                document.execCommand('copy');
+                
+                const copyBtn = event.target.closest('.copy-btn');
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                }, 2000);
+            },
+
+            saveSessionToLocal: function(session) {
+                const sessions = JSON.parse(localStorage.getItem('sessions') || '{}');
+                sessions[session.id] = session;
+                localStorage.setItem('sessions', JSON.stringify(sessions));
+            },
+
+            addToSessionHistory: function(session) {
+                const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
+                history.unshift({
+                    id: session.id,
+                    subject: session.subject,
+                    week: session.week,
+                    date: new Date().toISOString(),
+                    attendees: session.attendeeCount || 0,
+                    maxAttendees: session.maxAttendees,
+                    deviceId: this.deviceId,
+                    active: session.active
+                });
+                
+                if (history.length > 10) {
+                    history.length = 10;
+                }
+                
+                localStorage.setItem('sessionHistory', JSON.stringify(history));
+                this.renderSessionHistory();
+            },
+
+            updateSessionHistory: function(updatedSession) {
+                const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
+                const sessionIndex = history.findIndex(s => s.id === updatedSession.id);
+                
+                if (sessionIndex !== -1) {
+                    history[sessionIndex].attendees = updatedSession.attendeeCount || 0;
+                    history[sessionIndex].active = updatedSession.active;
+                    localStorage.setItem('sessionHistory', JSON.stringify(history));
+                    this.renderSessionHistory();
+                }
+            },
+
+            loadSessionHistory: function() {
+                this.renderSessionHistory();
+            },
+
+            renderSessionHistory: function() {
+                const historyList = document.getElementById('sessionHistoryList');
+                const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]')
+                    .filter(session => session.deviceId === this.deviceId);
+                
+                if (history.length === 0) {
+                    historyList.innerHTML = '<p>No previous sessions found</p>';
+                    document.getElementById('sessionHistoryCard').classList.add('hidden');
+                    return;
+                }
+                
+                historyList.innerHTML = history.map(session => `
+                    <div class="session-item">
+                        <div>
+                            <strong>${session.subject}</strong> - Week ${session.week}
+                            <div class="text-sm text-gray-500">
+                                ${new Date(session.date).toLocaleString()} | 
+                                ${session.attendees}/${session.maxAttendees} students
+                                ${session.active ? '<span class="text-green-500">(Active)</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="session-actions">
+                            <button onclick="attendanceApp.generateSessionQR('${session.id}')" class="btn btn-secondary" title="QR Code">
+                                <i class="fas fa-qrcode"></i>
+                            </button>
+                            <button onclick="attendanceApp.copySessionLink('${session.id}')" class="btn btn-secondary" title="Copy Link">
+                                <i class="fas fa-link"></i>
+                            </button>
+                            <button onclick="attendanceApp.downloadSessionReport('${session.id}')" class="btn btn-secondary" title="Download Report">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            ${session.active ? `
+                                <button onclick="attendanceApp.endSession('${session.id}')" class="btn btn-danger" title="End Session">
+                                    <i class="fas fa-stop-circle"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('sessionHistoryCard').classList.remove('hidden');
+            },
+
+            clearSessionHistory: function() {
+                localStorage.removeItem('sessionHistory');
+                this.renderSessionHistory();
+                this.showMessage('Session history cleared.', 'success');
+            },
+
+            generateSessionQR: function(sessionId) {
+                const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
+                const qr = qrcode(0, 'L');
+                qr.addData(formUrl);
+                qr.make();
+                
+                const qrContainer = document.getElementById('fullscreenQr');
+                qrContainer.innerHTML = qr.createImgTag(10);
+                document.getElementById('qrModal').style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            },
+
+            copySessionLink: function(sessionId) {
+                const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
+                navigator.clipboard.writeText(formUrl)
+                    .then(() => {
+                        this.showMessage('Session link copied to clipboard!', 'success');
+                    })
+                    .catch(err => {
+                        this.showMessage('Failed to copy link', 'danger');
+                        console.error('Could not copy text: ', err);
+                    });
+            },
+
+            downloadSessionReport: async function(sessionId) {
+                const sessions = JSON.parse(localStorage.getItem('sessions') || '{}');
+                const session = sessions[sessionId];
+                
+                if (!session) {
+                    this.showMessage('Session data not found', 'danger');
+                    return;
+                }
+                
+                const roster = session.roster || [];
+                const attendees = session.attendees || [];
+                const week = session.week;
+                const subjectName = session.subject;
+                const allWeeks = [...(session.existingWeeks || []), week].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
+                
+                // Get token data
+                const tokensSnap = await window.dbGet(window.dbRef(window.database, `sessions/${sessionId}/tokens`));
+                const tokenMap = tokensSnap.val() || {};
+                
+                // Token flags
+                const tokenNotes = {};
+                Object.entries(tokenMap).forEach(([token, data]) => {
+                    if (data.flagged && data.secondStudentId) {
+                        tokenNotes[data.id] = `Same token with ${data.secondStudentId}`;
+                        tokenNotes[data.secondStudentId] = `Same token with ${data.id}`;
+                    }
+                });
+
+                // IP flags
+                const ipMap = {};
+                attendees.forEach(a => {
+                    if (!a.ip) return;
+                    if (!ipMap[a.ip]) ipMap[a.ip] = [];
+                    ipMap[a.ip].push(a.id);
+                });
+
+                const ipNotes = {};
+                Object.entries(ipMap).forEach(([ip, ids]) => {
+                    if (ids.length > 1) {
+                        ids.forEach(id => {
+                            ipNotes[id] = `Same IP with ${ids.filter(x => x !== id).join(', ')}`;
+                        });
+                    }
+                });
+
+                const data = [];
+                
+                if (session.existingWeeks?.length > 0) {
+                    roster.forEach(student => {
+                    const matched = attendees.find(a => a.id === student.id);
+                    const row = {
+                        'Student ID': student.id,
+                        'Name': student.name,
+                        'Section': student.section || ''
+                    };
+                    
+                    allWeeks.forEach(w => {
+                        if (w === week) {
+                            row[`Week ${w}`] = matched ? 1 : 0;
+                            row[`Timestamp Week ${w}`] = matched ? 
+                                    new Date(matched.timestamp).toLocaleString() : 'N/A';
+                        } else {
+                            row[`Week ${w}`] = student.weekData?.[w] || 0;
+                            row[`Timestamp Week ${w}`] = student[`Timestamp Week ${w}`] || 'N/A';
+                        }
+                    });
+                    
+                    row['Total Attendance'] = allWeeks.reduce((sum, w) => sum + (Number(row[`Week ${w}`]) || 0), 0);
+
+                    // Add IP note if applicable
+                        const ipNote = ipNotes[student.id] || '';
+                        
+                    // Add token note if applicable
+                        const tokenNote = tokenNotes[student.id] || '';
+                    
+                    // Combine notes
+                        row['Note'] = [ipNote, tokenNote].filter(Boolean).join(' | ');
+                    
+                    // Add flagged column if token was misused
+                    row['Flagged'] = tokenNote ? 'Yes' : '';
+                    
+                        data.push(row);
+                    });
+                } else {
+                    roster.forEach(student => {
+                        const matched = attendees.find(a => a.id === student.id);
+                        const row = {
+                            'Student ID': student.id,
+                            'Name': student.name,
+                            'Section': student.section || '',
+                            [`Week ${week}`]: matched ? 1 : 0,
+                            'Total Attendance': matched ? 1 : 0,
+                            [`Timestamp Week ${week}`]: matched ? 
+                                new Date(matched.timestamp).toLocaleString() : 'N/A'
+                        };
+
+                        // Add IP note if applicable
+                        const ipNote = ipNotes[student.id] || '';
+                        
+                        // Add token note if applicable
+                        const tokenNote = tokenNotes[student.id] || '';
+                        
+                        // Combine notes
+                        row['Note'] = [ipNote, tokenNote].filter(Boolean).join(' | ');
+                        
+                        // Add flagged column if token was misused
+                        row['Flagged'] = tokenNote ? 'Yes' : '';
+                        
+                        data.push(row);
+                    });
+                }
+                
+                // Add flagged submissions at the end
+                attendees.filter(a => a.flagged).forEach(flagged => {
+                    if (!data.some(r => r['Student ID'] === flagged.id)) {
+                        data.push({
+                            'Student ID': flagged.id,
+                            'Name': flagged.name || 'Flagged Submission',
+                            'Section': flagged.section || '',
+                            [`Week ${week}`]: 0,
+                            'Total Attendance': 0,
+                            [`Timestamp Week ${week}`]: new Date(flagged.timestamp).toLocaleString(),
+                            'Note': flagged.note || 'Flagged submission',
+                            'Flagged': 'Yes'
+                        });
+                    }
+                });
+                
+                const columnOrder = ['Student ID', 'Name', 'Section'];
+                
+                allWeeks.forEach(week => {
+                    columnOrder.push(`Week ${week}`);
+                });
+                
+                columnOrder.push('Total Attendance');
+                
+                allWeeks.forEach(week => {
+                    columnOrder.push(`Timestamp Week ${week}`);
+                });
+
+                // Add Note and Flagged columns
+                columnOrder.push('Note');
+                columnOrder.push('Flagged');
+                
+                const reorderedData = data.map(row => {
+                    const newRow = {};
+                    columnOrder.forEach(col => {
+                        if (row[col] !== undefined) {
+                            newRow[col] = row[col];
+                        }
+                    });
+                    return newRow;
+                });
+                
+                const ws = XLSX.utils.json_to_sheet(reorderedData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+                
+                const today = new Date();
+                const dateStr = today.toISOString().split('T')[0];
+                let fileName;
+                
+                if (allWeeks.length > 1) {
+                    fileName = `${subjectName} Attendance from Week ${Math.min(...allWeeks)} to ${Math.max(...allWeeks)} ${dateStr}.xlsx`;
+                } else {
+                    fileName = `${subjectName} Attendance for Week ${week} ${dateStr}.xlsx`;
+                }
+                
+                XLSX.writeFile(wb, fileName);
+            },
+
+            initVoiceCommands: function() {
+                try {
+                    if ('webkitSpeechRecognition' in window) {
+                        this.recognition = new webkitSpeechRecognition();
+                    } else if ('SpeechRecognition' in window) {
+                        this.recognition = new SpeechRecognition();
+                    } else {
+                        throw new Error('Speech recognition not supported');
+                    }
+                    
+                    this.recognition.continuous = false;
+                    this.recognition.interimResults = false;
+                    this.recognition.lang = 'en-US';
+                    
+                    this.recognition.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript.toLowerCase();
+                        this.handleVoiceCommand(transcript);
+                    };
+                    
+                    this.recognition.onerror = (event) => {
+                        console.error('Voice recognition error', event.error);
+                        if (event.error === 'not-allowed') {
+                            this.showMessage('Microphone access denied. Please enable microphone permissions.', 'danger');
+                        }
+                    };
+                    
+                    document.getElementById('voiceBtn').addEventListener('click', () => {
+                        try {
+                            navigator.mediaDevices.getUserMedia({ audio: true })
+                                .then(() => {
+                                    this.recognition.start();
+                                    document.getElementById('voiceBtn').innerHTML = '<i class="fas fa-microphone-slash"></i>';
+                                    this.showMessage('Listening for commands...', 'info');
+                                })
+                                .catch(err => {
+                                    console.error('Microphone access error:', err);
+                                    this.showMessage('Microphone access required for voice commands', 'danger');
+                                });
+                        } catch (error) {
+                            console.error('Voice recognition failed:', error);
+                            this.showMessage('Voice commands not supported in your browser', 'danger');
+                        }
+                    });
+                    
+                    this.recognition.onend = () => {
+                        document.getElementById('voiceBtn').innerHTML = '<i class="fas fa-microphone"></i>';
+                    };
+                } catch (error) {
+                    console.error('Voice recognition not supported:', error);
+                    document.getElementById('voiceBtn').style.display = 'none';
+                }
+            },
+
+            handleVoiceCommand: function(command) {
+                this.showMessage(`Heard: "${command}"`, 'info');
+                
+                if (command.includes('start session') || command.includes('begin session')) {
+                    if (!document.getElementById('createSessionBtn').disabled) {
+                        document.getElementById('sessionForm').dispatchEvent(new Event('submit'));
+                    } else {
+                        this.showMessage('Please upload a roster first', 'warning');
+                    }
+                } else if (command.includes('end session') || command.includes('stop session')) {
+                    const activeSession = this.currentSessions.find(s => s.active);
+                    if (activeSession) {
+                        this.endSession(activeSession.id);
+                    } else {
+                        this.showMessage('No active session to end', 'warning');
+                    }
+                } else if (command.includes('fullscreen') || command.includes('show qr')) {
+                    const activeSession = this.currentSessions.find(s => s.active);
+                    if (activeSession) {
+                        this.openFullscreenQR(activeSession.id);
+                    } else {
+                        this.showMessage('No active session to show QR code', 'warning');
+                    }
+                } else if (command.includes('copy link') || command.includes('session link')) {
+                    const activeSession = this.currentSessions.find(s => s.active);
+                    if (activeSession) {
+                        this.copyToClipboard(activeSession.id);
+                    } else {
+                        this.showMessage('No active session to copy link', 'warning');
+                    }
+                } else {
+                    this.showMessage('Command not recognized. Try "start session" or "end session"', 'warning');
+                }
+            },
+
+            showMessage: function(text, type) {
+                const messageDiv = document.getElementById('message');
+                messageDiv.textContent = text;
+                messageDiv.className = `alert alert-${type}`;
+                messageDiv.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    messageDiv.classList.add('hidden');
+                }, 5000);
+            },
+
+            openLocationModal: function() {
+                const modal = document.getElementById('locationQRModal');
+                const qrContainer = document.getElementById('locationQRCode');
+                const locationUrl = `${window.location.origin}/location.html?session=${Date.now()}`;
+                
+                // Generate QR code
+                const qr = qrcode(0, 'L');
+                qr.addData(locationUrl);
+                qr.make();
+                qrContainer.innerHTML = qr.createImgTag(10);
+                
+                // Show modal
+                modal.classList.remove('hidden');
+                
+                // Set up message listener for location data
+                window.addEventListener('message', this.handleLocationMessage);
+            },
+
+            handleLocationMessage: function(event) {
+                // Verify origin for security
+                if (event.origin !== window.location.origin) return;
+                
+                const { lat, lng, accuracy } = event.data;
+                if (lat && lng) {
+                    attendanceApp.classLocation = { lat, lng, accuracy };
+                    document.getElementById('locationPreview').textContent = 
+                        `Location set: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy.toFixed(0)}m)`;
+                    
+                    // Close modal
+                    document.getElementById('locationQRModal').classList.add('hidden');
+                    
+                    // Remove message listener
+                    window.removeEventListener('message', attendanceApp.handleLocationMessage);
+                    
+                    // Show success message
+                    attendanceApp.showMessage('Location set successfully!', 'success');
+                }
+            },
+
+            closeLocationModal: function() {
+                const modal = document.getElementById('locationQRModal');
+                modal.classList.add('hidden');
+                window.removeEventListener('message', this.handleLocationMessage);
+            },
+
+            updateSubjectName: function() {
+                const newSubject = document.getElementById('subjectNameInput').value.trim();
+                if (newSubject) {
+                    this.subjectName = newSubject;
+                    this.showMessage('Subject name updated successfully!', 'success');
+                        } else {
+                    this.showMessage('Please enter a valid subject name', 'danger');
+                }
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            attendanceApp.init();
+        });
+
+        window.app = attendanceApp;
+    </script>
 </body>
 </html>
