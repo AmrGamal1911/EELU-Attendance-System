@@ -734,6 +734,7 @@
 
                     // Check if current IP matches TA's IP
                     if (this.currentIP === this.sessionData.taIP) {
+                        document.getElementById('submitBtn').disabled = false; // Explicitly enable for TA
                         resolve({
                             success: true,
                             message: 'Location verified (TA device)',
@@ -746,7 +747,7 @@
                         });
                         return;
                     }
-                    
+
                     if (!navigator.geolocation) {
                         resolve({ 
                             success: false,
@@ -758,18 +759,8 @@
 
                     this.showMessage('Verifying your location...', 'info');
                     
-                    const timeoutId = setTimeout(() => {
-                        resolve({
-                            success: false,
-                            message: 'Location request timed out. Please try again.',
-                            locationData: null
-                        });
-                    }, 15000); // 15 second timeout
-                    
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
-                            clearTimeout(timeoutId);
-                            
                             const studentLat = position.coords.latitude;
                             const studentLng = position.coords.longitude;
                             const classLat = this.sessionData.classLocation.lat;
@@ -787,7 +778,7 @@
                                     latitude: studentLat,
                                     longitude: studentLng
                                 },
-                                accuracy: Math.min(position.coords.accuracy, 20), // Cap accuracy at 20m
+                                accuracy: Math.min(position.coords.accuracy, 20),
                                 timestamp: new Date().toISOString(),
                                 distance: Math.round(distance),
                                 classLocation: {
@@ -798,10 +789,13 @@
 
                             // Add accuracy buffer to max distance
                             const maxDistance = this.sessionData.locationDistance || 50;
-                            const accuracyBuffer = Math.min(position.coords.accuracy, 20); // Cap accuracy buffer at 20m
+                            const accuracyBuffer = Math.min(position.coords.accuracy, 20);
                             const totalAllowedDistance = maxDistance + accuracyBuffer;
                             
-                            if (distance <= totalAllowedDistance) {
+                            const isWithinRange = distance <= totalAllowedDistance;
+                            document.getElementById('submitBtn').disabled = !isWithinRange; // Update button state
+
+                            if (isWithinRange) {
                                 resolve({ 
                                     success: true,
                                     message: `Location verified (${Math.round(distance)}m from class)`,
@@ -816,7 +810,6 @@
                             }
                         },
                         (error) => {
-                            clearTimeout(timeoutId);
                             console.error('Location error:', error);
                             resolve({ 
                                 success: false,
@@ -890,7 +883,8 @@
 
             startLocationCheck: async function() {
                 if (!this.sessionData.useLocation) {
-                            return;
+                    document.getElementById('submitBtn').disabled = false; // Enable if location not required
+                    return;
                 }
 
                 if (!navigator.geolocation) {
