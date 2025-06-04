@@ -45,6 +45,7 @@
             --primary: #667eea;
             --success: #10b981;
             --danger: #ef4444;
+            --info: #3b82f6;
             --border-radius: 12px;
         }
         
@@ -109,6 +110,10 @@
             cursor: not-allowed;
             transform: none;
         }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+        }
         
         .alert {
             padding: 1rem;
@@ -128,6 +133,13 @@
             color: #b91c1c;
             border: 1px solid rgba(239, 68, 68, 0.2);
         }
+
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #1e40af;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            display: block;
+        }
         
         .spinner {
             border: 3px solid rgba(102, 126, 234, 0.2);
@@ -144,16 +156,83 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .location-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .status-container {
+            margin-top: 1rem;
+        }
+
+        .form-section {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            border: 1px solid #e5e7eb;
+        }
+
+        .form-section.hidden {
+            display: none;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1><i class="fas fa-map-marker-alt"></i> Set Class Location</h1>
         <div id="message" class="alert"></div>
-        <div id="spinner" class="spinner"></div>
-        <button id="getLocationBtn" class="btn">
-            <i class="fas fa-location-arrow"></i> Get Current Location
-        </button>
+        
+        <div class="location-section">
+            <div id="spinner" class="spinner"></div>
+            <button id="getLocationBtn" class="btn">
+                <i class="fas fa-location-arrow"></i> Get Current Location
+            </button>
+            
+            <div id="locationStatus" class="status-container">
+                <div class="alert alert-info">
+                    Waiting for location...
+                </div>
+            </div>
+            
+            <div id="locationNameForm" class="form-section hidden">
+                <div class="form-group">
+                    <label for="locationName">Location Name:</label>
+                    <input type="text" id="locationName" class="form-control" placeholder="e.g., Room 101" required>
+                </div>
+                <button onclick="saveLocation()" class="btn btn-success">
+                    <i class="fas fa-save"></i> Save Location
+                </button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -168,14 +247,19 @@
 
         function showMessage(text, type) {
             const messageDiv = document.getElementById('message');
-            messageDiv.textContent = text;
-            messageDiv.className = `alert alert-${type}`;
-            messageDiv.style.display = 'block';
+            if (messageDiv) {
+                messageDiv.textContent = text;
+                messageDiv.className = `alert alert-${type}`;
+                messageDiv.style.display = 'block';
+            } else {
+                console.error('Message div not found:', text);
+            }
         }
 
         async function getLocation() {
             const spinner = document.getElementById('spinner');
             const button = document.getElementById('getLocationBtn');
+            const locationStatus = document.getElementById('locationStatus');
             
             if (!navigator.geolocation) {
                 showMessage('Geolocation is not supported by your browser', 'danger');
@@ -206,18 +290,23 @@
                 if (await window.sendLocationToFirebase(locationData, sessionId)) {
                     showMessage('Location set successfully!', 'success');
                     
-                    // Update UI
-                    document.getElementById('locationStatus').innerHTML = `
-                        <div class="alert alert-success">
-                            <p><strong>Location acquired:</strong></p>
-                            <p>Latitude: ${locationData.lat.toFixed(6)}</p>
-                            <p>Longitude: ${locationData.lng.toFixed(6)}</p>
-                            <p>Accuracy: ±${Math.round(locationData.accuracy)}m</p>
-                        </div>
-                    `;
+                    // Update UI - safely
+                    if (locationStatus) {
+                        locationStatus.innerHTML = `
+                            <div class="alert alert-success">
+                                <p><strong>Location acquired:</strong></p>
+                                <p>Latitude: ${locationData.lat.toFixed(6)}</p>
+                                <p>Longitude: ${locationData.lng.toFixed(6)}</p>
+                                <p>Accuracy: ±${Math.round(locationData.accuracy)}m</p>
+                            </div>
+                        `;
+                    }
                     
                     // Show location name form
-                    document.getElementById('locationNameForm').classList.remove('hidden');
+                    const locationNameForm = document.getElementById('locationNameForm');
+                    if (locationNameForm) {
+                        locationNameForm.classList.remove('hidden');
+                    }
                 } else {
                     throw new Error('Failed to save location data');
                 }
@@ -243,8 +332,8 @@
                 }
                 showMessage(message, 'danger');
             } finally {
-                spinner.style.display = 'none';
-                button.disabled = false;
+                if (spinner) spinner.style.display = 'none';
+                if (button) button.disabled = false;
             }
         }
 
