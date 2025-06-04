@@ -680,10 +680,11 @@
                     if (this.sessionData.attendees) {
                         const sameIPAttendees = Object.values(this.sessionData.attendees)
                             .filter(a => a.deviceInfo?.ip === this.currentIP && a.id !== student.id)
-                            .map(a => a.id);
+                            .map(a => ({id: a.id, name: a.name}));
                             
                         if (sameIPAttendees.length > 0) {
-                            attendanceData.notes.push(`Same IP address as student(s): ${sameIPAttendees.join(', ')}`);
+                            const sameIPInfo = sameIPAttendees.map(a => a.id).join(', ');
+                            attendanceData.notes.push(`Same IP address with ${sameIPInfo}`);
                         }
                     }
 
@@ -746,7 +747,7 @@
                     }
 
                     this.showMessage('Verifying your location...', 'info');
-
+                    
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
                             const studentLat = position.coords.latitude;
@@ -776,7 +777,7 @@
                             };
 
                             // Add accuracy buffer to max distance
-                            const maxDistance = (this.sessionData.locationDistance || 50);
+                            const maxDistance = 50; // Set default max distance to 50 meters
                             const accuracyBuffer = Math.min(position.coords.accuracy, 20); // Cap accuracy buffer at 20m
                             const totalAllowedDistance = maxDistance + accuracyBuffer;
                             
@@ -790,7 +791,7 @@
                                 const extraDistance = Math.round(distance - totalAllowedDistance);
                                 resolve({ 
                                     success: false,
-                                    message: `You are too far from the class location. You need to be ${extraDistance}m closer to attend. Current distance: ${Math.round(distance)}m, Maximum allowed: ${maxDistance}m (plus ${accuracyBuffer}m accuracy buffer)`,
+                                    message: `You are ${Math.round(distance)}m from the class location. Maximum allowed distance is ${maxDistance}m (plus ${accuracyBuffer}m accuracy buffer).`,
                                     locationData: locationData
                                 });
                             }
@@ -869,7 +870,7 @@
 
             startLocationCheck: async function() {
                 if (!this.sessionData.useLocation) {
-                            return;
+                    return;
                 }
 
                 if (!navigator.geolocation) {
@@ -877,31 +878,20 @@
                     return;
                 }
 
-                const locationStatus = document.getElementById('locationStatus');
-                locationStatus.textContent = 'Verifying your location...';
-                document.getElementById('locationVerification').style.display = 'block';
-
                 try {
                     const locationResult = await this.verifyLocation();
                     
                     if (locationResult.success) {
-                        locationStatus.innerHTML = '<i class="fas fa-check-circle"></i> ' + locationResult.message;
-                        locationStatus.className = 'text-success';
+                        this.showMessage(locationResult.message, 'success');
                         document.getElementById('submitBtn').disabled = false;
                     } else {
-                        locationStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + locationResult.message;
-                        locationStatus.className = 'text-danger';
-                        document.getElementById('submitBtn').disabled = true;
-                        
-                        // Show detailed error message
                         this.showMessage(locationResult.message, 'danger');
+                        document.getElementById('submitBtn').disabled = true;
                     }
-                    } catch (error) {
+                } catch (error) {
                     console.error('Location check error:', error);
-                    locationStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> Location verification failed';
-                    locationStatus.className = 'text-danger';
-                    document.getElementById('submitBtn').disabled = true;
                     this.showMessage('Failed to verify location: ' + error.message, 'danger');
+                    document.getElementById('submitBtn').disabled = true;
                 }
             },
 
@@ -935,27 +925,46 @@
                             <p>Waiting for students to join...</p>
                         </div>
                     `;
-                        return;
+                    return;
+                }
+                
+                // Group attendees by IP address
+                const ipGroups = {};
+                attendees.forEach(attendee => {
+                    const ip = attendee.deviceInfo?.ip;
+                    if (ip) {
+                        if (!ipGroups[ip]) {
+                            ipGroups[ip] = [];
+                        }
+                        ipGroups[ip].push(attendee);
                     }
-                    
+                });
+
                 const attendeesHtml = attendees
                     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
                     .map(attendee => {
                         let notesHtml = '';
-                        if (attendee.notes && attendee.notes.length > 0) {
+                        const ip = attendee.deviceInfo?.ip;
+                        
+                        // Check for same IP
+                        if (ip && ipGroups[ip].length > 1) {
+                            const otherStudents = ipGroups[ip]
+                                .filter(a => a.id !== attendee.id)
+                                .map(a => a.id)
+                                .join(', ');
                             notesHtml = `
-                                <div class="text-red-500 mt-1">
-                                    <i class="fas fa-info-circle"></i> 
-                                    ${attendee.notes.join('<br>')}
+                                <div class="alert alert-warning mt-1" style="display: block; margin: 0.5rem 0;">
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    Same IP address as: ${otherStudents}
                                 </div>
                             `;
                         }
 
                         let locationHtml = '';
                         if (attendee.location) {
-                            const locationClass = attendee.location.verified ? 'text-green-500' : 'text-red-500';
+                            const locationClass = attendee.location.verified ? 'alert-success' : 'alert-danger';
                             locationHtml = `
-                                <div class="${locationClass} mt-1">
+                                <div class="alert ${locationClass} mt-1" style="display: block; margin: 0.5rem 0;">
                                     <i class="fas fa-map-marker-alt"></i> 
                                     ${attendee.location.verificationMessage}
                                 </div>
@@ -963,17 +972,18 @@
                         }
 
                         return `
-                            <div class="attendee-item">
+                            <div class="attendee-item" style="border-bottom: 1px solid #e5e7eb; padding: 1rem 0;">
                                 <div class="attendee-info">
-                                    <span class="attendee-name">${attendee.name}</span>
-                                    <span class="attendee-details">
-                                        ID: ${attendee.id} | Section: ${attendee.section}
-                                        ${notesHtml}
-                                        ${locationHtml}
-                                    </span>
-                                </div>
-                                <div class="attendee-time">
-                                    ${new Date(attendee.timestamp).toLocaleTimeString()}
+                                    <div style="font-weight: 500; color: #1f2937;">
+                                        ${attendee.name} (${attendee.id})
+                                    </div>
+                                    <div style="color: #6b7280; font-size: 0.875rem;">
+                                        Section: ${attendee.section}
+                                        <br>
+                                        Time: ${new Date(attendee.timestamp).toLocaleTimeString()}
+                                    </div>
+                                    ${notesHtml}
+                                    ${locationHtml}
                                 </div>
                             </div>
                         `;
@@ -995,30 +1005,23 @@
                 const attendees = session.attendees || [];
                 const currentWeek = parseInt(session.week);
                 const subjectName = session.subject;
-                const allWeeks = [...(session.existingWeeks || []), currentWeek].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
                 
-                // Final report data
-                const reportData = [];
-                
-                roster.forEach(student => {
-                    const matched = attendees.find(a => a.id === student.id);
-                    const row = {
+                // Create report data
+                const reportData = roster.map(student => {
+                    const attended = attendees.find(a => a.id === student.id);
+                    return {
                         'Student ID': student.id,
                         'Name': student.name,
                         'Section': student.section || '',
-                        'Status': matched ? 'Present' : 'Absent',
-                        'Timestamp': matched ? new Date(matched.timestamp).toLocaleString() : 'N/A',
-                        'Notes': matched ? (matched.notes || []).join('; ') : '',
-                        'Location Status': matched?.location ? 
-                            (matched.location.verified ? 'Verified' : 'Not Verified') + 
-                            ` (${matched.location.verificationMessage})` : 'N/A'
+                        [`Week ${currentWeek}`]: attended ? 1 : 0,
+                        'Total Attendance': attended ? 1 : 0,
+                        'Timestamp': attended ? new Date(attended.timestamp).toLocaleString() : 'N/A',
+                        'Note': attended && attended.notes ? attended.notes.join('; ') : ''
                     };
-                    
-                    reportData.push(row);
                 });
                 
                 // Generate CSV
-                const headers = Object.keys(reportData[0]);
+                const headers = ['Student ID', 'Name', 'Section', `Week ${currentWeek}`, 'Total Attendance', 'Timestamp', 'Note'];
                 const csv = [
                     headers.join(','),
                     ...reportData.map(row => headers.map(header => 
