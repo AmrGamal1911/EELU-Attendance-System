@@ -1100,8 +1100,8 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="ta_email"><i class="fas fa-envelope"></i> Your Outlook Email</label>
-                    <input type="email" id="ta_email" name="ta_email" placeholder="Enter your Outlook email" required>
+                    <label for="ta_email"><i class="fas fa-envelope"></i> Your Outlook Email (Optional)</label>
+                    <input type="email" id="ta_email" name="ta_email" placeholder="Enter your Outlook email">
                 </div>
                 
                 <!-- Location Settings -->
@@ -1269,7 +1269,18 @@
                                 <i class="fas fa-users"></i> ${session.attendees}/${session.maxAttendees} students
                             </span>
                             <div class="session-actions">
-                                <button onclick="attendanceApp.exportAttendanceReport('${session.id}')" class="btn btn-secondary btn-sm">
+                                ${session.active ? `
+                                    <button onclick="attendanceApp.openFullscreenQR('${session.id}')" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-qrcode"></i> QR Code
+                                    </button>
+                                    <button onclick="attendanceApp.copyToClipboard('${session.id}')" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-link"></i> Copy Link
+                                    </button>
+                                    <button onclick="attendanceApp.endSession('${session.id}')" class="btn btn-danger btn-sm">
+                                        <i class="fas fa-stop-circle"></i> End
+                                    </button>
+                                ` : ''}
+                                <button onclick="attendanceApp.exportAttendanceReport('${session.id}')" class="btn btn-success btn-sm">
                                     <i class="fas fa-download"></i> Export
                                 </button>
                             </div>
@@ -1502,7 +1513,7 @@
                         return;
                     }
                     
-                    if (!app.subjectName || !week || !maxAttendees || !taEmail) {
+                    if (!app.subjectName || !week || !maxAttendees) {
                         app.showMessage('Please fill in all required fields', 'danger');
                         return;
                     }
@@ -1514,77 +1525,77 @@
                     
                     document.getElementById('sessionsContainer').innerHTML = '';
                     
-                    try {
-                        const sessionId = 'session_' + Date.now();
-                        
+                        try {
+                            const sessionId = 'session_' + Date.now();
+                            
                         // Save TA's IP for blocking
                         const taIP = await fetch('https://api.ipify.org?format=json')
                             .then(res => res.json())
-                            .then(data => data.ip)
-                            .catch(() => 'unknown');
+                                .then(data => data.ip)
+                                .catch(() => 'unknown');
 
-                        const newSession = {
-                            id: sessionId,
-                            subject: app.subjectName,
-                            week,
-                            password,
-                            maxAttendees,
-                            roster: app.rosterData,
-                            taEmail,
-                            createdAt: window.dbServerTimestamp(),
-                            active: true,
-                            attendeeCount: 0,
-                            useLocation,
-                            locationDistance,
-                            deviceId: app.deviceId,
+                            const newSession = {
+                                id: sessionId,
+                                subject: app.subjectName,
+                                week,
+                                password,
+                                maxAttendees,
+                                roster: app.rosterData,
+                                taEmail,
+                                createdAt: window.dbServerTimestamp(),
+                                active: true,
+                                attendeeCount: 0,
+                                useLocation,
+                                locationDistance,
+                                deviceId: app.deviceId,
                             existingWeeks: [...(app.existingWeeks || [])],
-                            maxExistingWeek: app.maxExistingWeek,
+                                maxExistingWeek: app.maxExistingWeek,
                             taIP
-                        };
-                        
-                        if (useLocation && app.classLocation) {
-                            newSession.classLocation = app.classLocation;
-                        }
-                        
-                        const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
-                        await window.dbSet(sessionRef, newSession);
-                        
-                        app.saveSessionToLocal(newSession);
+                            };
                             
-                        const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
-                            
-                        const sessionData = {
-                            ...newSession,
-                            sessionRef,
-                            attendeesRef,
-                            syncStatus: 'connecting'
-                        };
-                            
-                        app.currentSessions.push(sessionData);
-                        app.displaySession(sessionData);
-                            
-                        // Monitor attendees
-                        window.dbOnValue(attendeesRef, (snapshot) => {
-                            const attendees = snapshot.val() || {};
-                            const attendeeList = Object.values(attendees);
-                            sessionData.attendees = attendeeList;
-                            sessionData.attendeeCount = attendeeList.length;
-                            
-                            app.updateSessionDisplay(sessionData);
-                            
-                            if (attendeeList.length >= maxAttendees && sessionData.active) {
-                                app.endSession(sessionData.id);
+                            if (useLocation && app.classLocation) {
+                                newSession.classLocation = app.classLocation;
                             }
                             
-                            app.saveSessionToLocal(sessionData);
-                        });
-                            
-                        app.showMessage('Attendance session started successfully!', 'success');
-                        app.addToSessionHistory(sessionData);
-                        document.getElementById('sessionHistoryCard').classList.remove('hidden');
-                            
-                    } catch (error) {
-                        console.error('Error creating session:', error);
+                                const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
+                                await window.dbSet(sessionRef, newSession);
+                        
+                                app.saveSessionToLocal(newSession);
+                                
+                                const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
+                                
+                                const sessionData = {
+                                    ...newSession,
+                                    sessionRef,
+                                    attendeesRef,
+                                    syncStatus: 'connecting'
+                                };
+                                
+                                app.currentSessions.push(sessionData);
+                                app.displaySession(sessionData);
+                                
+                        // Monitor attendees
+                                window.dbOnValue(attendeesRef, (snapshot) => {
+                                    const attendees = snapshot.val() || {};
+                                    const attendeeList = Object.values(attendees);
+                                    sessionData.attendees = attendeeList;
+                                    sessionData.attendeeCount = attendeeList.length;
+                                    
+                                    app.updateSessionDisplay(sessionData);
+                                    
+                                    if (attendeeList.length >= maxAttendees && sessionData.active) {
+                                        app.endSession(sessionData.id);
+                                    }
+                                    
+                                    app.saveSessionToLocal(sessionData);
+                                });
+                                
+                                app.showMessage('Attendance session started successfully!', 'success');
+                                app.addToSessionHistory(sessionData);
+                                document.getElementById('sessionHistoryCard').classList.remove('hidden');
+                                
+                            } catch (error) {
+                                console.error('Error creating session:', error);
                         app.showMessage('Failed to create session: ' + error.message, 'danger');
                     }
                 });
@@ -2538,7 +2549,7 @@
                     document.getElementById('locationName').value = '';
                     document.getElementById('locationStatus').style.display = 'block';
                     document.getElementById('locationNameForm').classList.add('hidden');
-                    } catch (error) {
+                } catch (error) {
                     console.error('Error saving location:', error);
                     this.showMessage('Failed to save location: ' + error.message, 'danger');
                 }
