@@ -403,8 +403,12 @@
                 }
 
                 this.sessionId = sessionId;
+                this.updateConnectionStatus('connecting');
                 
                 try {
+                    // Clean up any existing listeners
+                    this.cleanup();
+                    
                     // Get session data
                     const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
                     const snapshot = await window.dbGet(sessionRef);
@@ -420,9 +424,24 @@
                         return;
                     }
 
+                    // Get current IP
+                    try {
+                        const ipResponse = await fetch('https://api.ipify.org?format=json');
+                        const ipData = await ipResponse.json();
+                        this.currentIP = ipData.ip;
+                    } catch (error) {
+                        console.warn('Could not get IP:', error);
+                        this.currentIP = 'unknown';
+                    }
+
+                    // Set up Firebase references
+                    this.sessionRef = sessionRef;
+                    this.attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
+
                     // Update session info display
                     document.getElementById('displaySubject').textContent = this.sessionData.subject;
                     document.getElementById('displayWeek').textContent = this.sessionData.week;
+                    document.getElementById('maxAttendees').textContent = this.sessionData.maxAttendees;
                     
                     // Show password field if required
                     if (this.sessionData.password) {
@@ -431,24 +450,30 @@
                     
                     // If using location verification
                     if (this.sessionData.useLocation) {
-                        this.watchLocation();
+                        await this.startLocationCheck();
+                    } else {
+                        document.getElementById('submitBtn').disabled = false;
                     }
-                    
-                    // Enable submit button if everything is ready
-                    document.getElementById('submitBtn').disabled = false;
                     
                     // Set up real-time listeners
                     this.setupRealtimeListeners();
                     
+                    // Show active session UI
+                    document.getElementById('loadingSection').classList.add('hidden');
+                    document.getElementById('activeSession').classList.remove('hidden');
+                    
+                    // Update connection status
+                    this.updateConnectionStatus('connected');
+                    
                 } catch (error) {
                     console.error('Session initialization error:', error);
-                    this.showMessage('Error loading session: ' + error.message, 'danger');
-                    this.showNoSession();
+                    this.handleInitializationError(error);
                 }
             },
 
             cleanup: function() {
                 console.log('Cleaning up form resources...');
+                // Clean up Firebase listeners
                 if (this.sessionRef) {
                     window.dbOff(this.sessionRef);
                     this.sessionRef = null;
@@ -457,72 +482,25 @@
                     window.dbOff(this.attendeesRef);
                     this.attendeesRef = null;
                 }
-            },
-
-            initializeSession: async function() {
-                console.log('Setting up session connection...');
-                this.updateConnectionStatus('connecting');
                 
-                try {
-                    // Clean up any existing listeners
-                    this.cleanup();
-                    
-                    // Set up session reference
-                    this.sessionRef = window.dbRef(window.database, `sessions/${this.currentSessionId}`);
-                    
-                    // Get the session data
-                    const sessionSnapshot = await window.dbGet(this.sessionRef);
-                    console.log('Session snapshot received:', sessionSnapshot.exists() ? 'yes' : 'no');
-                    
-                    if (!sessionSnapshot.exists()) {
-                        console.error('Session does not exist');
-                        this.showNoSession();
-                        return;
-                    }
-
-                    const sessionData = sessionSnapshot.val();
-                    if (!sessionData) {
-                        throw new Error('Invalid session data');
-                    }
-
-                    console.log('Initial session data:', sessionData ? 'received' : 'empty');
-                    console.log('Session active status:', sessionData.active);
-                    
-                    this.sessionData = sessionData;
-                    this.attendeesRef = window.dbRef(window.database, `sessions/${this.currentSessionId}/attendees`);
-
-                    // Show initial session state first
-                    if (!this.sessionData.active) {
-                        console.log('Session is not active, showing closed state');
-                        this.showClosedSession();
-                        return;
-                    }
-
-                    // Initialize UI first
-                        this.showActiveSession();
-                        this.updateConnectionStatus('connected');
-                        
-                    // Handle location check if needed
-                    if (this.sessionData.useLocation) {
-                        try {
-                            await this.startLocationCheck();
-                        } catch (error) {
-                            console.warn('Location check failed:', error);
-                            // Show warning but don't block session
-                            this.showMessage('Location verification failed: ' + error.message, 'warning');
-                        }
-                    }
-
-                    // Set up real-time listeners
-                    this.setupRealtimeListeners();
-
-                } catch (error) {
-                    console.error('Session initialization error:', error);
-                    this.handleInitializationError(error);
-                }
+                // Reset state
+                this.sessionData = null;
+                this.currentIP = null;
+                this.lastLocation = null;
+                
+                // Reset UI
+                document.getElementById('submitBtn').disabled = true;
+                document.getElementById('student_id').value = '';
+                document.getElementById('password').value = '';
+                document.getElementById('passwordField').classList.add('hidden');
             },
 
             setupRealtimeListeners: function() {
+                if (!this.sessionId) return;
+                
+                // Clean up existing listeners first
+                this.cleanup();
+                
                 // Session listener
                 this.sessionRef = window.dbRef(window.database, `sessions/${this.sessionId}`);
                 window.dbOnValue(this.sessionRef, (snapshot) => {
@@ -765,8 +743,18 @@
 
                     this.showMessage('Verifying your location...', 'info');
                     
+                    const timeoutId = setTimeout(() => {
+                        resolve({
+                            success: false,
+                            message: 'Location request timed out. Please try again.',
+                            locationData: null
+                        });
+                    }, 15000); // 15 second timeout
+                    
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
+                            clearTimeout(timeoutId);
+                            
                             const studentLat = position.coords.latitude;
                             const studentLng = position.coords.longitude;
                             const classLat = this.sessionData.classLocation.lat;
@@ -794,7 +782,7 @@
                             };
 
                             // Add accuracy buffer to max distance
-                            const maxDistance = 50; // Set default max distance to 50 meters
+                            const maxDistance = this.sessionData.locationDistance || 50;
                             const accuracyBuffer = Math.min(position.coords.accuracy, 20); // Cap accuracy buffer at 20m
                             const totalAllowedDistance = maxDistance + accuracyBuffer;
                             
@@ -814,6 +802,7 @@
                             }
                         },
                         (error) => {
+                            clearTimeout(timeoutId);
                             console.error('Location error:', error);
                             resolve({ 
                                 success: false,
@@ -1130,6 +1119,11 @@
         document.addEventListener('DOMContentLoaded', () => {
             console.log('DOM loaded, initializing form...');
             formApp.init();
+            
+            // Clean up when page is closed
+            window.addEventListener('beforeunload', () => {
+                formApp.cleanup();
+            });
         });
     </script>
 </body>
