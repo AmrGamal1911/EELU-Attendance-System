@@ -999,16 +999,6 @@
                 <div id="locationPreview">Waiting for location from mobile device...</div>
                 <div class="spinner mt-2"></div>
             </div>
-
-            <div id="locationNameForm" class="hidden">
-                <div class="form-group">
-                    <label for="locationName">Location Name:</label>
-                    <input type="text" id="locationName" placeholder="e.g., Room 101" required>
-                </div>
-                <button onclick="saveLocation()" class="btn btn-success">
-                    <i class="fas fa-save"></i> Save Location
-                </button>
-            </div>
             
             <div class="flex gap-4 mt-4">
                 <button onclick="attendanceApp.closeLocationModal()" class="btn btn-danger">
@@ -2384,16 +2374,21 @@
                 if (event.data.type === 'location') {
                     const locationData = event.data.data;
                     if (locationData.lat && locationData.lng) {
-                        // Store the location temporarily
+                        // Store the location
                         this.classLocation = locationData;
                         
                         // Update location preview
                         document.getElementById('locationPreview').textContent = 
-                            `Coordinates: (${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)})`;
+                            `Location set: (${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)})`;
                         
-                        // Hide spinner and show location name form
+                        // Hide spinner
                         document.querySelector('#locationStatus .spinner').style.display = 'none';
-                        document.getElementById('locationNameForm').classList.remove('hidden');
+                        
+                        // Close modal
+                        this.closeLocationModal();
+                        
+                        // Show success message
+                        this.showMessage('Location set successfully!', 'success');
                     }
                 }
             },
