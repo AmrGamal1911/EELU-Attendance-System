@@ -1864,18 +1864,45 @@
                         let notesHtml = '';
                         const ip = attendee.deviceInfo?.ip;
                         
-                        // Check for same IP
+                        // Check for same IP and add notes
                         if (ip && ipGroups[ip].length > 1) {
                             const otherStudents = ipGroups[ip]
                                 .filter(a => a.id !== attendee.id)
-                                .map(a => a.id)
+                                .map(a => `${a.id} (${a.name})`)
                                 .join(', ');
-                            notesHtml = `
+                            notesHtml += `
                                 <div class="alert alert-warning mt-1" style="display: block; margin: 0.5rem 0;">
                                     <i class="fas fa-exclamation-triangle"></i> 
-                                    Same IP address as: ${otherStudents}
+                                    Same IP address with: ${otherStudents}
                                 </div>
                             `;
+                            
+                            // Add attendance record note
+                            if (attendee.weekData) {
+                                const weekNum = sessionData.week;
+                                if (attendee.weekData[weekNum]) {
+                                    notesHtml += `
+                                        <div class="alert alert-info mt-1" style="display: block; margin: 0.5rem 0;">
+                                            <i class="fas fa-info-circle"></i> 
+                                            Attendance recorded for Week ${weekNum}
+                                        </div>
+                                    `;
+                                }
+                            }
+                        }
+
+                        // Add any additional notes from the attendance record
+                        if (attendee.notes && attendee.notes.length > 0) {
+                            attendee.notes.forEach(note => {
+                                if (!notesHtml.includes(note)) { // Avoid duplicate notes
+                                    notesHtml += `
+                                        <div class="alert alert-info mt-1" style="display: block; margin: 0.5rem 0;">
+                                            <i class="fas fa-info-circle"></i> 
+                                            ${note}
+                                        </div>
+                                    `;
+                                }
+                            });
                         }
 
                         let locationHtml = '';
@@ -1919,9 +1946,6 @@
                     progressFill.style.width = `${percentage}%`;
                     attendedCount.textContent = attendees.length;
                 }
-                
-                // Update session history if needed
-                this.updateSessionHistory();
             },
 
             exportAttendanceReport: async function(sessionId) {
