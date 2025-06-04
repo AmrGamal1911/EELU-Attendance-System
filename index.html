@@ -1086,6 +1086,9 @@
                     this.openLocationModal();
                 });
 
+                // Load saved locations
+                this.loadSavedLocations();
+                
                 // Set up automatic file processing
                 const rosterInput = document.getElementById('roster');
                 rosterInput.addEventListener('change', (e) => this.handleFileSelection(e));
@@ -2515,7 +2518,7 @@
                 
                 if (!locationName) {
                     this.showMessage('Please enter a location name', 'danger');
-                            return;
+                    return;
                 }
                 
                 if (!this.classLocation) {
@@ -2523,43 +2526,75 @@
                     return;
                 }
                 
-                // Save to localStorage
-                const savedLocations = JSON.parse(localStorage.getItem('savedLocations') || '{}');
+                // Save to localStorage with device ID
+                const deviceId = localStorage.getItem('deviceId') || Date.now().toString();
+                const savedLocations = JSON.parse(localStorage.getItem(`savedLocations_${deviceId}`) || '{}');
                 savedLocations[locationName] = this.classLocation;
-                localStorage.setItem('savedLocations', JSON.stringify(savedLocations));
+                localStorage.setItem(`savedLocations_${deviceId}`, JSON.stringify(savedLocations));
                 
                 // Update location preview in the main form
+                document.getElementById('locationPreview').style.display = 'block';
                 document.getElementById('locationPreview').textContent = 
                     `Location: ${locationName} (${this.classLocation.lat.toFixed(6)}, ${this.classLocation.lng.toFixed(6)})`;
                 
                 // Update location dropdown
-                const locationSelect = document.createElement('select');
-                locationSelect.id = 'locationSelect';
-                locationSelect.className = 'form-control';
-                
-                Object.keys(savedLocations).forEach(name => {
-                    const option = document.createElement('option');
-                    option.value = name;
-                    option.textContent = name;
-                    if (name === locationName) {
-                        option.selected = true;
-                    }
-                    locationSelect.appendChild(option);
-                });
-                
-                const container = document.getElementById('locationSettings');
-                const existingSelect = document.getElementById('locationSelect');
-                if (existingSelect) {
-                    container.replaceChild(locationSelect, existingSelect);
-                } else {
-                    container.insertBefore(locationSelect, container.firstChild);
-                }
+                this.updateLocationDropdown(locationName);
                 
                 // Close modal properly
                 document.getElementById('locationQRModal').classList.add('hidden');
                 
                 // Show success message
                 this.showMessage('Location saved successfully!', 'success');
+            },
+
+            updateLocationDropdown: function(selectedLocationName = null) {
+                const deviceId = localStorage.getItem('deviceId') || Date.now().toString();
+                const savedLocations = JSON.parse(localStorage.getItem(`savedLocations_${deviceId}`) || '{}');
+                const locationSelect = document.getElementById('locationSelect');
+                
+                if (!locationSelect) {
+                    return;
+                }
+                
+                // Clear existing options
+                locationSelect.innerHTML = '<option value="">Select a saved location</option>';
+                
+                // Add saved locations
+                Object.keys(savedLocations).forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    if (name === selectedLocationName) {
+                        option.selected = true;
+                    }
+                    locationSelect.appendChild(option);
+                });
+            },
+
+            // Add this new function to load saved locations on init
+            loadSavedLocations: function() {
+                const deviceId = localStorage.getItem('deviceId') || Date.now().toString();
+                const savedLocations = JSON.parse(localStorage.getItem(`savedLocations_${deviceId}`) || '{}');
+                
+                // Update the dropdown with saved locations
+                this.updateLocationDropdown();
+                
+                // Add event listener for location select change
+                const locationSelect = document.getElementById('locationSelect');
+                if (locationSelect) {
+                    locationSelect.addEventListener('change', (e) => {
+                        const selectedName = e.target.value;
+                        if (selectedName) {
+                            const location = savedLocations[selectedName];
+                            if (location) {
+                                this.classLocation = location;
+                                document.getElementById('locationPreview').style.display = 'block';
+                                document.getElementById('locationPreview').textContent = 
+                                    `Location: ${selectedName} (${location.lat.toFixed(6)}, ${location.lng.toFixed(6)})`;
+                            }
+                        }
+                    });
+                }
             }
         };
 
