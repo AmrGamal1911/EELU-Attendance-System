@@ -389,56 +389,60 @@
             lastLocation: null,
             locationAttempts: 0,
             maxLocationAttempts: 3,
-            currentToken: null,
-            deviceId: null,
+            deviceId: localStorage.getItem('deviceId') || Date.now().toString(),
             currentIP: null,
 
             init: async function() {
-                try {
-                    console.log('Starting form initialization...');
-                    this.currentSessionId = new URLSearchParams(window.location.search).get('session');
-                    this.deviceId = localStorage.getItem('deviceId') || crypto.randomUUID();
-                    localStorage.setItem('deviceId', this.deviceId);
+                const urlParams = new URLSearchParams(window.location.search);
+                const sessionId = urlParams.get('session');
                 
-                if (!this.currentSessionId) {
-                        console.error('No session ID provided');
-                        this.showMessage('Invalid session link. Please use the link provided by your instructor.', 'danger');
-                    this.showNoSession();
+                if (!sessionId) {
+                    this.showMessage('Invalid session. Please scan the QR code again.', 'danger');
+                    document.getElementById('submitBtn').disabled = true;
                     return;
                 }
 
-                    // Get current IP
-                    try {
-                        const ipResponse = await fetch('https://api.ipify.org?format=json');
-                        if (!ipResponse.ok) throw new Error('IP fetch failed');
-                        const ipData = await ipResponse.json();
-                        this.currentIP = ipData.ip;
-                    } catch (error) {
-                        console.error('IP fetch error:', error);
-                        this.currentIP = 'unknown';
+                this.sessionId = sessionId;
+                
+                try {
+                    // Get session data
+                    const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
+                    const snapshot = await window.dbGet(sessionRef);
+                    this.sessionData = snapshot.val();
+                    
+                    if (!this.sessionData) {
+                        this.showNoSession();
+                        return;
                     }
 
-                    console.log('Initializing session:', this.currentSessionId);
+                    if (!this.sessionData.active) {
+                        this.showClosedSession();
+                        return;
+                    }
+
+                    // Update session info display
+                    document.getElementById('displaySubject').textContent = this.sessionData.subject;
+                    document.getElementById('displayWeek').textContent = this.sessionData.week;
                     
-                    // Verify Firebase is initialized
-                    if (!window.database || !window.dbRef) {
-                        throw new Error('Firebase not properly initialized');
+                    // Show password field if required
+                    if (this.sessionData.password) {
+                        document.getElementById('passwordField').classList.remove('hidden');
                     }
                     
-                    await this.initializeSession();
+                    // If using location verification
+                    if (this.sessionData.useLocation) {
+                        this.watchLocation();
+                    }
                     
-                    // Clean up listeners when page is closed or navigated away
-                    window.addEventListener('beforeunload', () => {
-                        this.cleanup();
-                    });
+                    // Enable submit button if everything is ready
+                    document.getElementById('submitBtn').disabled = false;
                     
-                    document.getElementById('attendanceForm').addEventListener('submit', (e) => {
-                        e.preventDefault();
-                        this.submitAttendance();
-                    });
+                    // Set up real-time listeners
+                    this.setupRealtimeListeners();
+                    
                 } catch (error) {
-                    console.error('Initialization error:', error);
-                    this.showMessage('Failed to initialize form: ' + error.message, 'danger');
+                    console.error('Session initialization error:', error);
+                    this.showMessage('Error loading session: ' + error.message, 'danger');
                     this.showNoSession();
                 }
             },
@@ -520,6 +524,7 @@
 
             setupRealtimeListeners: function() {
                 // Session listener
+                this.sessionRef = window.dbRef(window.database, `sessions/${this.sessionId}`);
                 window.dbOnValue(this.sessionRef, (snapshot) => {
                     const data = snapshot.val();
                     if (!data) {
@@ -527,9 +532,14 @@
                         return;
                     }
                     
+                    // Check if session state changed
+                    const wasActive = this.sessionData?.active;
                     this.sessionData = data;
                     
                     if (!this.sessionData.active) {
+                        if (wasActive) {
+                            this.showMessage('This session has ended', 'info');
+                        }
                         this.showClosedSession();
                         return;
                     }
@@ -543,6 +553,7 @@
                 });
                 
                 // Attendees listener
+                this.attendeesRef = window.dbRef(window.database, `sessions/${this.sessionId}/attendees`);
                 window.dbOnValue(this.attendeesRef, (snapshot) => {
                     if (!this.sessionData) return;
                     
@@ -550,8 +561,14 @@
                     const attendeeList = Object.values(attendees);
                     console.log('Received attendees update:', attendeeList.length, 'attendees');
                     
-                        this.sessionData.attendees = attendeeList;
-                        this.updateAttendanceCount();
+                    this.sessionData.attendees = attendeeList;
+                    this.updateAttendanceCount();
+                    
+                    // Check if session is full
+                    if (attendeeList.length >= this.sessionData.maxAttendees) {
+                        document.getElementById('submitBtn').disabled = true;
+                        this.showMessage('This session is full', 'info');
+                    }
                 }, (error) => {
                     console.error('Attendees listener error:', error);
                     this.showMessage('Error updating attendance list', 'warning');
@@ -736,7 +753,7 @@
                         });
                         return;
                     }
-
+                    
                     if (!navigator.geolocation) {
                         resolve({ 
                             success: false,
@@ -870,14 +887,14 @@
 
             startLocationCheck: async function() {
                 if (!this.sessionData.useLocation) {
-                    return;
+                            return;
                 }
 
                 if (!navigator.geolocation) {
                     this.showMessage('Your browser does not support location services', 'danger');
                     return;
                 }
-
+                
                 try {
                     const locationResult = await this.verifyLocation();
                     
@@ -1039,6 +1056,73 @@
                 a.click();
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
+            },
+
+            watchLocation: function() {
+                if (!navigator.geolocation) {
+                    this.showMessage('Geolocation is not supported by your browser.', 'danger');
+                    return;
+                }
+                
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                };
+                
+                navigator.geolocation.watchPosition(
+                    position => this.handleLocationSuccess(position),
+                    error => this.handleLocationError(error),
+                    options
+                );
+            },
+            
+            handleLocationSuccess: function(position) {
+                this.currentLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                    timestamp: new Date().toISOString()
+                };
+                
+                if (this.sessionData.useLocation) {
+                    const distance = this.calculateDistance(
+                        this.currentLocation.lat,
+                        this.currentLocation.lng,
+                        this.sessionData.classLocation.lat,
+                        this.sessionData.classLocation.lng
+                    );
+                    
+                    const maxDistance = this.sessionData.locationDistance || 50;
+                    const isWithinRange = distance <= maxDistance;
+                    
+                    const locationStatus = document.getElementById('locationStatus');
+                    locationStatus.className = `alert alert-${isWithinRange ? 'success' : 'danger'}`;
+                    locationStatus.textContent = isWithinRange ?
+                        `✓ You are within range (${Math.round(distance)}m from class location)` :
+                        `⚠ You are too far (${Math.round(distance)}m from class location)`;
+                    
+                    // Enable/disable submit button based on location
+                    document.getElementById('submitBtn').disabled = !isWithinRange;
+                }
+            },
+            
+            handleLocationError: function(error) {
+                let message = 'Error getting location: ';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        message += 'Location permission denied.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        message += 'Location information unavailable.';
+                        break;
+                    case error.TIMEOUT:
+                        message += 'Location request timed out.';
+                        break;
+                    default:
+                        message += error.message;
+                }
+                this.showMessage(message, 'danger');
             }
         };
 
