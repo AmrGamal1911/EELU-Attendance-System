@@ -2362,7 +2362,8 @@
             openLocationModal: function() {
                 const modal = document.getElementById('locationQRModal');
                 const qrContainer = document.getElementById('locationQRCode');
-                const locationUrl = `${window.location.origin}/location.html?session=${Date.now()}`;
+                const sessionId = Date.now().toString();
+                const locationUrl = `${window.location.origin}/location.html?session=${sessionId}`;
                 
                 // Generate QR code
                 const qr = qrcode(0, 'L');
@@ -2378,8 +2379,38 @@
                 // Show modal
                 modal.classList.remove('hidden');
                 
-                // Set up message listener for location data
-                window.addEventListener('message', this.handleLocationMessage);
+                // Listen for location updates from Firebase
+                const locationRef = window.dbRef(window.database, `temp-locations/${sessionId}`);
+                window.dbOnValue(locationRef, (snapshot) => {
+                    const locationData = snapshot.val();
+                    if (locationData) {
+                        // Store the location
+                        this.classLocation = {
+                            lat: locationData.lat,
+                            lng: locationData.lng,
+                            accuracy: locationData.accuracy
+                        };
+                        
+                        // Update location preview
+                        document.getElementById('locationPreview').textContent = 
+                            `Location coordinates: (${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)})`;
+                        
+                        // Hide spinner
+                        document.querySelector('#locationStatus .spinner').style.display = 'none';
+                        
+                        // Show location name form
+                        document.getElementById('locationNameForm').classList.remove('hidden');
+                        
+                        // Show success message
+                        this.showMessage('Location set successfully!', 'success');
+                        
+                        // Clean up the temporary location data
+                        window.dbSet(locationRef, null);
+                        
+                        // Remove the listener
+                        window.dbOff(locationRef);
+                    }
+                });
             },
 
             handleLocationMessage: function(event) {
