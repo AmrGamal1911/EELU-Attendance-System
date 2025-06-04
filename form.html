@@ -480,7 +480,7 @@
                     console.log('Initial session data:', sessionData ? 'received' : 'empty');
                     console.log('Session active status:', sessionData.active);
                     
-                    this.sessionData = sessionData;
+                        this.sessionData = sessionData;
                     this.attendeesRef = window.dbRef(window.database, `sessions/${this.currentSessionId}/attendees`);
 
                     // Show initial session state first
@@ -500,20 +500,20 @@
                     }
 
                     // Set up real-time listener
-                    window.dbOnValue(this.sessionRef, (snapshot) => {
-                        const data = snapshot.val();
+                window.dbOnValue(this.sessionRef, (snapshot) => {
+                    const data = snapshot.val();
                         if (!data) {
                             this.showNoSession();
                             return;
                         }
-
+                    
                         this.sessionData = data;
                         
                         if (!this.sessionData.active) {
-                            this.showClosedSession();
-                            return;
-                        }
-                        
+                        this.showClosedSession();
+                        return;
+                    }
+                    
                         this.showActiveSession();
                         this.updateConnectionStatus('connected');
                         
@@ -787,7 +787,7 @@
             startLocationCheck: function() {
                 if (!navigator.geolocation) {
                     this.showMessage('Geolocation is not supported by your browser', 'danger');
-                    return;
+                            return;
                 }
 
                 const locationStatus = document.getElementById('locationStatus');
