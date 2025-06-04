@@ -5,9 +5,330 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance System | EELU</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getDatabase, ref, set, onValue, push, serverTimestamp, off, get } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
+
+            const firebaseConfig = {
+                apiKey: "AIzaSyBObz0uvQdLKkCGF7Txb_EPw686FzTmAes",
+                authDomain: "eelu-attendance.firebaseapp.com",
+                databaseURL: "https://eelu-attendance-default-rtdb.firebaseio.com",
+                projectId: "eelu-attendance",
+                storageBucket: "eelu-attendance.appspot.com",
+                messagingSenderId: "5132239076",
+                appId: "1:5132239076:web:8a3ea3f78d1ca106596cf1",
+                measurementId: "G-D2WNX8RGRL"
+            };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        class AttendanceSystem {
+            constructor() {
+                this.rosterData = [];
+                this.subjectName = '';
+                this.existingWeeks = [];
+                this.maxExistingWeek = 0;
+                this.savedLocations = JSON.parse(localStorage.getItem('savedLocations') || '{}');
+                this.setupEventListeners();
+                this.initializeUI();
+            }
+
+            setupEventListeners() {
+                // File upload handling
+                const rosterInput = document.getElementById('roster');
+                const dropZone = document.querySelector('.file-upload');
+
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('drag-over');
+                });
+
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('drag-over');
+                });
+
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('drag-over');
+                    const file = e.dataTransfer.files[0];
+                    if (file) this.handleFileUpload(file);
+                });
+
+                rosterInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) this.handleFileUpload(file);
+                });
+
+                // Location toggle handling
+                const locationToggle = document.getElementById('useLocation');
+                locationToggle.addEventListener('change', () => {
+                    document.getElementById('locationSettings').classList.toggle('hidden', !locationToggle.checked);
+                });
+
+                // Form submission
+                document.getElementById('sessionForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.createSession();
+                });
+
+                // QR code scanning for location
+                document.getElementById('scanLocationBtn').addEventListener('click', () => {
+                    this.openLocationScanner();
+                });
+
+                // Listen for location data from mobile page
+                window.addEventListener('message', (event) => {
+                    if (event.data.type === 'location') {
+                        this.handleLocationData(event.data);
+                    }
+                });
+            }
+
+            initializeUI() {
+                // Initialize saved locations dropdown
+                this.updateLocationDropdown();
+                
+                // Set up subject name handling
+                const subjectInput = document.getElementById('subjectNameInput');
+                subjectInput.addEventListener('input', () => {
+                    this.subjectName = subjectInput.value.trim();
+                    this.updateCreateButtonState();
+                });
+            }
+
+            updateLocationDropdown() {
+                const dropdown = document.getElementById('savedLocations');
+                dropdown.innerHTML = '<option value="">Select a saved location</option>';
+                
+                Object.entries(this.savedLocations).forEach(([name, data]) => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = `${name} (${data.lat.toFixed(6)}, ${data.lng.toFixed(6)})`;
+                    dropdown.appendChild(option);
+                });
+            }
+
+            async handleFileUpload(file) {
+                try {
+                    const fileNameSpan = document.getElementById('fileName');
+                    fileNameSpan.textContent = file.name;
+
+                    // Auto-fill subject name from filename
+                    const subjectName = file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+                    document.getElementById('subjectNameInput').value = subjectName;
+                    this.subjectName = subjectName;
+
+                    const data = await this.readExcelFile(file);
+                    this.processRosterData(data);
+                    
+                    document.getElementById('rosterInfo').classList.remove('hidden');
+                    this.updateCreateButtonState();
+                    this.showMessage('Roster uploaded successfully!', 'success');
+                } catch (error) {
+                    console.error('File upload error:', error);
+                    this.showMessage('Error processing file: ' + error.message, 'danger');
+                }
+            }
+
+            async readExcelFile(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                            resolve(jsonData);
+                        } catch (error) {
+                            reject(new Error('Invalid file format'));
+                        }
+                    };
+                    reader.onerror = () => reject(new Error('File read error'));
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            processRosterData(data) {
+                // Skip header row and empty rows
+                const rows = data.filter(row => row.length > 0);
+                if (rows.length < 2) throw new Error('File contains no data');
+
+                const headers = rows[0].map(h => String(h).toLowerCase().trim());
+                const idIndex = headers.findIndex(h => h.includes('id'));
+                const nameIndex = headers.findIndex(h => h.includes('name'));
+                const sectionIndex = headers.findIndex(h => h.includes('section'));
+
+                if (idIndex === -1 || nameIndex === -1) {
+                    throw new Error('File must contain student ID and name columns');
+                }
+
+                this.rosterData = [];
+                this.existingWeeks = [];
+
+                // Process each row
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row[idIndex] || !row[nameIndex]) continue;
+
+                    const student = {
+                        id: String(row[idIndex]).trim(),
+                        name: String(row[nameIndex]).trim(),
+                        section: sectionIndex !== -1 ? String(row[sectionIndex] || '').trim() : ''
+                    };
+
+                    // Look for week columns (e.g., "Week 1", "W1", etc.)
+                    headers.forEach((header, index) => {
+                        if (/week|w\s*\d+/i.test(header)) {
+                            const weekNum = parseInt(header.match(/\d+/)[0]);
+                            if (weekNum > this.maxExistingWeek) {
+                                this.maxExistingWeek = weekNum;
+                            }
+                            if (!this.existingWeeks.includes(weekNum)) {
+                                this.existingWeeks.push(weekNum);
+                            }
+                            student[`week${weekNum}`] = row[index] || 0;
+                        }
+                    });
+
+                    this.rosterData.push(student);
+                }
+
+                // Update UI
+                document.getElementById('studentCount').textContent = this.rosterData.length;
+                document.getElementById('weekCount').textContent = 
+                    this.existingWeeks.length ? this.existingWeeks.sort((a,b) => a-b).join(', ') : 'None';
+
+                // Pre-fill week number if possible
+                const weekInput = document.getElementById('week');
+                weekInput.value = this.maxExistingWeek + 1;
+            }
+
+            async createSession() {
+                try {
+                    const week = document.getElementById('week').value;
+                    const maxAttendees = document.getElementById('max_attendees').value;
+                    const email = document.getElementById('ta_email').value;
+                    const useLocation = document.getElementById('useLocation').checked;
+                    
+                    if (!this.rosterData.length || !this.subjectName || !week || !maxAttendees) {
+                        throw new Error('Please fill in all required fields');
+                    }
+
+                    const sessionId = 'session_' + Date.now();
+                    const sessionData = {
+                        id: sessionId,
+                        subject: this.subjectName,
+                        week,
+                        maxAttendees: parseInt(maxAttendees),
+                        roster: this.rosterData,
+                        taEmail: email,
+                        createdAt: serverTimestamp(),
+                        active: true,
+                        attendeeCount: 0,
+                        useLocation,
+                        existingWeeks: [...this.existingWeeks],
+                        maxExistingWeek: this.maxExistingWeek
+                    };
+
+                    // Add location data if enabled
+                    if (useLocation) {
+                        const locationName = document.getElementById('savedLocations').value;
+                        if (!locationName || !this.savedLocations[locationName]) {
+                            throw new Error('Please select a valid location');
+                        }
+                        sessionData.classLocation = this.savedLocations[locationName];
+                        sessionData.locationDistance = parseInt(document.getElementById('locationDistance').value) || 50;
+                    }
+
+                    // Save session to Firebase
+                    await set(ref(database, `sessions/${sessionId}`), sessionData);
+
+                    // Generate QR code
+                    this.generateQRCode(sessionId);
+                    
+                    // Show success message
+                    this.showMessage('Session created successfully!', 'success');
+                    
+                    // Reset form
+                    document.getElementById('sessionForm').reset();
+                    document.getElementById('locationSettings').classList.add('hidden');
+        } catch (error) {
+                    console.error('Session creation error:', error);
+                    this.showMessage(error.message, 'danger');
+                }
+            }
+
+            generateQRCode(sessionId) {
+                const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
+                const qr = qrcode(0, 'L');
+                qr.addData(formUrl);
+                qr.make();
+
+                const qrContainer = document.getElementById('qrCode');
+                qrContainer.innerHTML = qr.createImgTag(10);
+                qrContainer.classList.remove('hidden');
+
+                // Add URL below QR code
+                const urlDiv = document.createElement('div');
+                urlDiv.className = 'mt-4 text-center';
+                urlDiv.innerHTML = `
+                    <p class="mb-2">Session URL:</p>
+                    <input type="text" value="${formUrl}" readonly class="form-control text-center">
+                `;
+                qrContainer.appendChild(urlDiv);
+            }
+
+            openLocationScanner() {
+                const locationId = Date.now();
+                const width = 500;
+                const height = 700;
+                const left = (screen.width - width) / 2;
+                const top = (screen.height - height) / 2;
+                
+                window.open(
+                    'location.html',
+                    'locationScanner',
+                    `width=${width},height=${height},left=${left},top=${top}`
+                );
+            }
+
+            handleLocationData(data) {
+                const { name, data: locationData } = data;
+                this.savedLocations[name] = locationData;
+                localStorage.setItem('savedLocations', JSON.stringify(this.savedLocations));
+                this.updateLocationDropdown();
+                document.getElementById('savedLocations').value = name;
+                this.showMessage(`Location "${name}" saved successfully!`, 'success');
+            }
+
+            showMessage(text, type) {
+                const messageDiv = document.getElementById('message');
+                messageDiv.textContent = text;
+                messageDiv.className = `alert alert-${type}`;
+                messageDiv.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    messageDiv.classList.add('hidden');
+                }, 5000);
+            }
+
+            updateCreateButtonState() {
+                const createBtn = document.getElementById('createSessionBtn');
+                createBtn.disabled = !this.rosterData.length || !this.subjectName;
+            }
+        }
+
+        // Initialize the system when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new AttendanceSystem();
+        });
+    </script>
     
     <style>
         :root {
@@ -188,7 +509,7 @@
             width: 16px;
         }
         
-        input {
+        input, select {
             width: 100%;
             padding: 0.875rem 1rem;
             border: 2px solid #e5e7eb;
@@ -197,7 +518,7 @@
             transition: all 0.3s ease;
         }
         
-        input:focus {
+        input:focus, select:focus {
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
             outline: none;
@@ -211,635 +532,118 @@
             margin-bottom: 1.5rem;
             transition: all 0.3s ease;
             background: var(--gradient-light);
+            cursor: pointer;
         }
         
-        .file-upload:hover {
+        .file-upload:hover, .file-upload.drag-over {
             border-color: var(--primary);
             background: rgba(102, 126, 234, 0.05);
         }
         
-        #fileName {
-            color: #6b7280;
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
-        }
-        
-        #qrcode {
-            padding: 1.5rem;
-            background: white;
-            border-radius: var(--border-radius);
-            display: inline-block;
-            border: 1px solid #f3f4f6;
-            margin: 1rem 0;
-            box-shadow: var(--shadow);
-            animation: scaleIn 0.5s ease-out;
-        }
-        
-        .session-url {
-            margin: 1.5rem 0;
-        }
-        
-        .session-url .input-group {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .session-url input {
-            flex: 1;
-        }
-        
-        .copy-btn {
-            padding: 0.875rem;
-            min-width: auto;
+        .file-upload input[type="file"] {
+            display: none;
         }
         
         .alert {
             padding: 1rem 1.5rem;
             border-radius: var(--border-radius);
             margin-bottom: 1.5rem;
-            border-left: 4px solid;
-            font-weight: 500;
-            animation: slideInRight 0.5s ease-out;
+            animation: slideInDown 0.5s ease-out;
         }
         
         .alert-success {
             background: rgba(16, 185, 129, 0.1);
             color: #047857;
-            border-left-color: var(--success);
+            border-left: 4px solid var(--success);
         }
         
         .alert-danger {
             background: rgba(239, 68, 68, 0.1);
             color: #b91c1c;
-            border-left-color: var(--danger);
+            border-left: 4px solid var(--danger);
         }
         
-        .session-status {
-            text-align: center;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 2rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1rem;
-        }
-        
-        .session-active {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
-            color: #047857;
-            border: 2px solid rgba(16, 185, 129, 0.2);
-        }
-        
-        .session-inactive {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
-            color: #b91c1c;
-            border: 2px solid rgba(239, 68, 68, 0.2);
-        }
-        
-        .sync-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-            padding: 0.5rem 1rem;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 50px;
-        }
-        
-        .sync-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #d1d5db;
-            transition: all 0.3s ease;
-        }
-        
-        .sync-indicator.connected {
-            background: var(--success);
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
-        }
-        
-        .sync-indicator.connecting {
-            background: var(--warning);
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.1); }
-        }
-        
-        #rosterInfo {
-            margin-top: 1.5rem;
-            padding: 1.5rem;
-            background: var(--gradient-light);
-            border-radius: var(--border-radius);
-            border: 1px solid rgba(102, 126, 234, 0.2);
-        }
-        
-        .attendance-list {
-            max-height: 400px;
-            overflow-y: auto;
-            margin-top: 1rem;
-            border-radius: var(--border-radius);
-            background: #f8fafc;
-            border: 1px solid #e5e7eb;
-        }
-        
-        .attendee-item {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid #f1f5f9;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            animation: slideInUp 0.5s ease-out;
-        }
-        
-        .attendee-item:last-child {
-            border-bottom: none;
-        }
-        
-        .attendee-info {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-        
-        .attendee-name {
-            font-weight: 600;
-            color: var(--dark);
-        }
-        
-        .attendee-details {
-            font-size: 0.875rem;
-            color: #6b7280;
-        }
-        
-        .attendee-time {
-            text-align: right;
-            font-size: 0.875rem;
-            color: #6b7280;
-        }
-        
-        .progress-container {
-            margin: 1.5rem 0;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #f1f5f9;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 0.5rem;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: var(--gradient);
-            transition: width 0.5s ease;
-            border-radius: 4px;
-        }
-        
-        .progress-text {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.875rem;
-            color: #6b7280;
-            font-weight: 500;
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #1d4ed8;
+            border-left: 4px solid var(--info);
         }
         
         .hidden {
-            display: none !important;
+            display: none;
         }
         
         .flex {
             display: flex;
         }
         
-        .flex-1 {
-            flex: 1;
-        }
-        
         .gap-4 {
             gap: 1rem;
         }
         
-        .mb-4 {
-            margin-bottom: 1rem;
+        .flex-1 {
+            flex: 1;
         }
         
-        .qr-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.9);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        .qr-modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
+        .text-center {
             text-align: center;
-            width: 90%;
-            max-width: 500px;
         }
         
-        .qr-modal img {
-            width: 100%;
-            max-height: 70vh;
+        .mb-2 {
+            margin-bottom: 0.5rem;
         }
         
-        .close-modal {
+        .mt-4 {
             margin-top: 1rem;
-            cursor: pointer;
         }
         
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-            margin-left: 10px;
-        }
-        
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 34px;
-        }
-        
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        
-        input:checked + .toggle-slider {
-            background-color: var(--primary);
-        }
-        
-        input:checked + .toggle-slider:before {
-            transform: translateX(26px);
-        }
-        
-        .session-history {
-            margin-top: 2rem;
-        }
-        
-        .session-item {
-            padding: 1rem;
+        .form-control {
+            width: 100%;
+            padding: 0.5rem;
             border: 1px solid #e5e7eb;
             border-radius: var(--border-radius);
-            margin-bottom: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .session-item:hover {
-            background-color: #f8fafc;
-        }
-        
-        .session-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .voice-btn {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: var(--gradient);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: var(--shadow-lg);
-            z-index: 100;
-            transition: all 0.3s ease;
-            overflow: hidden;
-        }
-        
-        .voice-btn::before {
-            content: 'Voice Commands';
-            position: absolute;
-            right: 70px;
-            white-space: nowrap;
-            background: var(--gradient);
-            padding: 0.5rem 1rem;
-            border-radius: 30px;
-            opacity: 0;
-            transition: all 0.3s ease;
-            font-size: 0.9rem;
-        }
-        
-        .voice-btn:hover {
-            width: 200px;
-            border-radius: 30px;
-            justify-content: flex-end;
-            padding-right: 1rem;
-        }
-        
-        .voice-btn:hover::before {
-            opacity: 1;
-            right: 50px;
-        }
-        
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-        }
-        
-        .modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: var(--border-radius-lg);
-            width: 90%;
-            max-width: 800px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        
-        .modal.hidden {
-            display: none;
-        }
-        
-        .full-width {
-            width: 100%;
-        }
-        
-        .pac-container {
-            z-index: 2100 !important;
-        }
-        
-        .location-btn {
-            display: none;
-            margin-left: 10px;
-            padding: 0.5rem;
-        }
-        
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            font-size: 0.875rem;
         }
         
         @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-50%) scaleX(0);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(-50%) scaleX(1);
-            }
+            from { transform: translateX(-50%) scaleX(0); }
+            to { transform: translateX(-50%) scaleX(1); }
         }
         
-        @keyframes slideInRight {
-            from {
-                opacity: 0;
-                transform: translateX(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        @keyframes scaleIn {
-            from {
-                opacity: 0;
-                transform: scale(0.8);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
+        @keyframes slideInDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        @media (max-width: 768px) {
+        @media (max-width: 640px) {
             .container {
                 padding: 1rem;
-            }
-            
-            header h1 {
-                font-size: 2rem;
             }
             
             .card {
                 padding: 1.5rem;
             }
             
-            .session-url .input-group {
+            header h1 {
+                font-size: 2rem;
+            }
+            
+            .flex {
                 flex-direction: column;
             }
             
-            .attendee-item {
-                flex-direction: column;
-                align-items: flex-start;
+            .gap-4 {
                 gap: 0.5rem;
-            }
-            
-            .attendee-time {
-                text-align: left;
-            }
-            
-            .voice-btn:hover {
-                width: 60px;
-                border-radius: 50%;
-                justify-content: center;
-                padding-right: 0;
-            }
-            
-            .voice-btn:hover::before {
-                display: none;
-            }
-        }
-
-        .session-card {
-            margin-bottom: 2rem;
-        }
-
-        .session-card:last-child {
-            margin-bottom: 0;
-        }
-        
-        .update-subject-btn {
-            margin-left: 10px;
-            padding: 0.5rem;
-            background: var(--info);
-            color: white;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            border: none;
-            cursor: pointer;
-        }
-        
-        .session-feedback {
-            text-align: center;
-            padding: 2rem;
-            border-radius: var(--border-radius);
-            background: #f8fafc;
-            margin-bottom: 1.5rem;
-        }
-
-        .text-red-500 {
-            color: #ef4444;
-        }
-        
-        .spinner {
-            width: 30px;
-            height: 30px;
-            border: 3px solid rgba(102, 126, 234, 0.1);
-            border-radius: 50%;
-            border-top-color: var(--primary);
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .student-qr-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin: 1.5rem 0;
-            max-height: 70vh;
-            overflow-y: auto;
-            padding: 1rem;
-        }
-
-        .student-qr-item {
-            background: #f8fafc;
-            border-radius: var(--border-radius);
-            padding: 1rem;
-            text-align: center;
-            border: 1px solid #e5e7eb;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .student-qr-item img {
-            width: 100%;
-            height: auto;
-            border: 1px solid #e5e7eb;
-            border-radius: var(--border-radius);
-        }
-
-        .student-info {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .student-info span {
-            color: #6b7280;
-            font-size: 0.875rem;
-        }
-
-        .student-links-grid {
-            display: grid;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .student-link-item {
-            background: #f8fafc;
-            border-radius: var(--border-radius);
-            padding: 1rem;
-            border: 1px solid #e5e7eb;
-        }
-
-        .link-actions {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-        }
-
-        .link-actions input {
-            flex: 1;
-            font-size: 0.875rem;
-            padding: 0.5rem;
-            background: white;
-        }
-
-        .btn-sm {
-            padding: 0.5rem;
-            min-width: auto;
-        }
-
-        @media (max-width: 640px) {
-            .student-qr-list {
-                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -858,21 +662,19 @@
             <h2><i class="fas fa-cloud-upload-alt"></i> Upload Student Roster</h2>
             <div class="file-upload">
                 <input type="file" id="roster" name="roster" accept=".xlsx,.csv" hidden>
-                <label for="roster" class="btn">
-                    <i class="fas fa-file-excel"></i> Select Excel/CSV File
+                <label for="roster">
+                    <i class="fas fa-file-excel"></i>
+                    <span>Drag & drop or click to upload Excel/CSV file</span>
                 </label>
-                <div id="fileName">Drag & drop or click to browse files</div>
+                <div id="fileName">No file selected</div>
             </div>
             <div id="rosterInfo" class="hidden">
                 <div class="flex gap-4">
                     <div class="form-group flex-1">
-                        <label for="subjectNameInput"><i class="fas fa-book"></i> Subject Name</label>
-                        <div style="display: flex; align-items: center;">
-                            <input type="text" id="subjectNameInput" placeholder="Enter subject name">
-                            <button type="button" class="update-subject-btn" onclick="attendanceApp.updateSubjectName()">
-                                <i class="fas fa-sync-alt"></i> Update
-                            </button>
-                        </div>
+                        <label for="subjectNameInput">
+                            <i class="fas fa-book"></i> Subject Name
+                        </label>
+                        <input type="text" id="subjectNameInput" placeholder="Enter subject name">
                     </div>
                     <div class="flex-1">
                         <p><strong><i class="fas fa-users"></i> Students:</strong> <span id="studentCount">0</span></p>
@@ -884,397 +686,72 @@
 
         <!-- Create Session Section -->
         <div class="card">
-            <h2><i class="fas fa-play-circle"></i> Create Attendance Session</h2>
+            <h2><i class="fas fa-plus-circle"></i> Create Attendance Session</h2>
             <form id="sessionForm">
                 <div class="flex gap-4">
                     <div class="form-group flex-1">
-                        <label for="week"><i class="fas fa-calendar-week"></i> Week Number</label>
-                        <input type="number" id="week" name="week" min="1" max="52" placeholder="e.g., 1" required>
-                    </div>
-                    
-                    <div class="form-group flex-1">
-                        <label for="max_attendees"><i class="fas fa-user-friends"></i> Max Attendees</label>
-                        <input type="number" id="max_attendees" name="max_attendees" min="1" max="500" value="30" required>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="ta_email"><i class="fas fa-envelope"></i> Your Outlook Email</label>
-                    <input type="email" id="ta_email" name="ta_email" placeholder="Enter your Outlook email" required>
-                </div>
-                
-                <div class="form-group">
-                    <label style="display: flex; align-items: center;">
-                        <i class="fas fa-map-marker-alt"></i> Enable Location Check
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="useLocation">
-                            <span class="toggle-slider"></span>
+                        <label for="week">
+                            <i class="fas fa-calendar-week"></i> Week Number
                         </label>
-                        <button type="button" id="setLocationBtn" class="btn btn-secondary location-btn">
-                            <i class="fas fa-map-marked-alt"></i> Set Location
-                        </button>
-                    </label>
-                    <div id="locationSettings" class="hidden">
-                        <select id="savedLocations" class="form-control mb-4">
-                            <option value="">Select a saved location</option>
-                        </select>
-                        <button type="button" id="scanLocationQR" class="btn btn-secondary">
-                            <i class="fas fa-qrcode"></i> Scan New Location
-                        </button>
+                        <input type="number" id="week" min="1" required>
                     </div>
+                    <div class="form-group flex-1">
+                        <label for="max_attendees">
+                            <i class="fas fa-users"></i> Max Attendees
+                        </label>
+                        <input type="number" id="max_attendees" min="1" value="30" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ta_email">
+                        <i class="fas fa-envelope"></i> Outlook Email (Optional)
+                    </label>
+                    <input type="email" id="ta_email" placeholder="your.email@outlook.com">
+                </div>
+                
+                <div class="form-group">
+                    <label class="flex gap-4">
+                        <input type="checkbox" id="useLocation">
+                        <span><i class="fas fa-map-marker-alt"></i> Enable Location Verification</span>
+                    </label>
+                </div>
+                
+                <div id="locationSettings" class="hidden">
+                    <div class="flex gap-4">
+                        <div class="form-group flex-1">
+                            <label for="savedLocations">
+                                <i class="fas fa-map-marked-alt"></i> Saved Locations
+                            </label>
+                            <select id="savedLocations" required>
+                                <option value="">Select a saved location</option>
+                            </select>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label for="locationDistance">
+                                <i class="fas fa-ruler"></i> Max Distance (meters)
+                            </label>
+                            <input type="number" id="locationDistance" value="50" min="10" max="1000">
+                        </div>
+                    </div>
+                    <button type="button" id="scanLocationBtn" class="btn btn-secondary">
+                        <i class="fas fa-qrcode"></i> Scan New Location
+                    </button>
                 </div>
                 
                 <button type="submit" id="createSessionBtn" class="btn" disabled>
-                    <i class="fas fa-rocket"></i> Launch Session
+                    <i class="fas fa-plus-circle"></i> Create Session
                 </button>
             </form>
         </div>
 
-        <!-- Active Session Section -->
-        <div id="activeSession" class="card hidden">
-            <h2><i class="fas fa-check-circle"></i> Session Active</h2>
-            <div class="session-info">
-                <p>
-                    <span><i class="fas fa-book"></i> Subject:</span>
-                    <strong id="activeSubject">-</strong>
-                </p>
-                <p>
-                    <span><i class="fas fa-calendar-week"></i> Week:</span>
-                    <strong id="activeWeek">-</strong>
-                </p>
-                <p>
-                    <span><i class="fas fa-users"></i> Attendees:</span>
-                    <strong><span id="attendeeCount">0</span>/<span id="maxAttendees">-</span></strong>
-                </p>
-            </div>
-
+        <!-- QR Code Section -->
+        <div id="qrCode" class="card hidden">
+            <h2><i class="fas fa-qrcode"></i> Session QR Code</h2>
             <div class="text-center">
-                <div id="qrcode"></div>
-                <div class="session-url">
-                    <div class="input-group">
-                        <input type="text" id="sessionUrl" readonly>
-                        <button class="btn btn-secondary" id="copyUrl">
-                            <i class="fas fa-copy"></i> Copy URL
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Sessions Container -->
-        <div id="sessionsContainer"></div>
-
-        <!-- Session History Section -->
-        <div class="card session-history hidden" id="sessionHistoryCard">
-            <h2><i class="fas fa-history"></i> Session History</h2>
-            <div id="sessionHistoryList"></div>
-            <button onclick="attendanceApp.clearSessionHistory()" class="btn btn-danger">
-                <i class="fas fa-trash"></i> Clear History
-            </button>
-        </div>
-    </div>
-
-    <!-- QR Code Modal -->
-    <div id="qrModal" class="qr-modal">
-        <div class="qr-modal-content">
-            <div id="fullscreenQr"></div>
-            <button onclick="attendanceApp.closeFullscreenQR()" class="btn close-modal">
-                <i class="fas fa-times"></i> Close
-            </button>
-        </div>
-    </div>
-
-    <!-- Location Picker Modal -->
-    <div id="locationQRModal" class="modal hidden">
-        <div class="modal-content">
-            <h2><i class="fas fa-qrcode"></i> Set Location via Mobile</h2>
-            <p class="text-center mb-4">Scan this QR code with your mobile device to set the class location</p>
-            
-            <div id="locationQRCode" class="text-center"></div>
-            
-            <div id="locationStatus" class="alert alert-info mt-4">
-                <div id="locationPreview">Waiting for location from mobile device...</div>
-                <div class="spinner mt-2"></div>
-            </div>
-            
-            <div class="flex gap-4 mt-4">
-                <button onclick="attendanceApp.closeLocationModal()" class="btn btn-danger">
-                    <i class="fas fa-times"></i> Cancel
-                </button>
+                <!-- QR code will be inserted here -->
             </div>
         </div>
     </div>
-
-    <!-- Voice Command Button -->
-    <div class="voice-btn" id="voiceBtn" title="Voice Commands">
-        <i class="fas fa-microphone"></i>
-    </div>
-
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
-        import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBObz0uvQdLKkCGF7Txb_EPw686FzTmAes",
-            authDomain: "eelu-attendance.firebaseapp.com",
-            databaseURL: "https://eelu-attendance-default-rtdb.firebaseio.com",
-            projectId: "eelu-attendance",
-            storageBucket: "eelu-attendance.appspot.com",
-            messagingSenderId: "5132239076",
-            appId: "1:5132239076:web:8a3ea3f78d1ca106596cf1",
-            measurementId: "G-D2WNX8RGRL"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
-
-        // Global variables
-        let rosterData = null;
-        let detectedWeeks = [];
-        let savedLocations = JSON.parse(localStorage.getItem('savedLocations') || '{}');
-        let isFirstSession = true;
-
-        // Create global attendanceApp object for function access
-        window.attendanceApp = {
-            updateSubjectName: function() {
-                const newSubjectName = document.getElementById('subjectNameInput').value.trim();
-                if (newSubjectName) {
-                    // Update UI
-                    document.getElementById('subjectNameInput').value = newSubjectName;
-                    
-                    // Show success message
-                    const message = document.getElementById('message');
-                    message.className = 'alert alert-success';
-                    message.textContent = 'Subject name updated successfully!';
-                    message.style.display = 'block';
-                    
-                    // Hide message after 3 seconds
-                    setTimeout(() => {
-                        message.style.display = 'none';
-                    }, 3000);
-                }
-            }
-        };
-
-        // Handle file upload
-        document.getElementById('roster').addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const fileName = file.name;
-            document.getElementById('fileName').textContent = fileName;
-            
-            // Extract subject name from filename (remove extension)
-            const subjectName = fileName.replace(/\.(xlsx|csv)$/, '');
-            document.getElementById('subjectNameInput').value = subjectName;
-            document.getElementById('rosterInfo').classList.remove('hidden');
-
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                const data = new Uint8Array(event.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-
-                // Process roster data
-                rosterData = jsonData.map(row => ({
-                    id: row['Student ID'] || row['ID'],
-                    name: row['Name'] || row['Student Name'],
-                    section: row['Section'],
-                    weeks: Object.keys(row).filter(key => key.toLowerCase().includes('week'))
-                }));
-
-                // Get unique weeks
-                detectedWeeks = [...new Set(rosterData.flatMap(student => student.weeks))].sort();
-
-                // Update UI
-                document.getElementById('studentCount').textContent = rosterData.length;
-                document.getElementById('weekCount').textContent = detectedWeeks.length || 'None';
-                
-                // Check if this is the first session for this subject
-                const subjectRef = ref(database, `subjects/${subjectName}`);
-                const snapshot = await get(subjectRef);
-                isFirstSession = !snapshot.exists();
-                
-                // Enable session creation
-                document.getElementById('createSessionBtn').disabled = false;
-            };
-            reader.readAsArrayBuffer(file);
-        });
-
-        // Handle location selection
-        document.getElementById('useLocation').addEventListener('change', (e) => {
-            const locationFields = document.getElementById('locationFields');
-            locationFields.style.display = e.target.checked ? 'block' : 'none';
-
-            // Populate saved locations
-            if (e.target.checked) {
-                const select = document.getElementById('savedLocations');
-                select.innerHTML = '<option value="">Select a saved location</option>';
-                Object.keys(savedLocations).forEach(name => {
-                    select.innerHTML += `<option value="${name}">${name}</option>`;
-                });
-            }
-        });
-
-        // Handle QR code scanning for location
-        document.getElementById('scanLocationQR').addEventListener('click', () => {
-            const width = 400;
-            const height = 600;
-            const left = (screen.width - width) / 2;
-            const top = (screen.height - height) / 2;
-            
-            window.locationWindow = window.open(
-                'location.html',
-                'LocationScanner',
-                `width=${width},height=${height},left=${left},top=${top}`
-            );
-        });
-
-        // Handle location data from location.html
-        window.addEventListener('message', (event) => {
-            if (event.data.lat && event.data.lng) {
-                const { lat, lng } = event.data;
-                const locationName = prompt('Enter a name for this location (e.g., "Room 1"):');
-                
-                if (locationName) {
-                    savedLocations[locationName] = { lat, lng };
-                    localStorage.setItem('savedLocations', JSON.stringify(savedLocations));
-                    
-                    // Update location dropdown
-                    const select = document.getElementById('savedLocations');
-                    select.innerHTML += `<option value="${locationName}" selected>${locationName}</option>`;
-                }
-            }
-        });
-
-        // Update the session creation event listener
-        document.getElementById('sessionForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            if (!rosterData) {
-                showMessage('Please upload a roster first', 'danger');
-                return;
-            }
-
-            const weekNumber = document.getElementById('week').value;
-            const maxAttendees = document.getElementById('max_attendees').value;
-            const email = document.getElementById('ta_email').value;
-            const useLocation = document.getElementById('useLocation').checked;
-            const selectedLocationName = document.getElementById('savedLocations').value;
-            
-            if (!weekNumber || !maxAttendees || !email) {
-                showMessage('Please fill in all required fields', 'danger');
-                return;
-            }
-
-            try {
-                // Generate session ID
-                const sessionId = Math.random().toString(36).substring(2, 15);
-                const subjectName = document.getElementById('subjectNameInput').value;
-
-                // Get selected location if enabled
-                let location = null;
-                if (useLocation && selectedLocationName) {
-                    location = savedLocations[selectedLocationName];
-                }
-
-                // Create session in Firebase
-                const sessionRef = ref(database, `sessions/${sessionId}`);
-                await set(sessionRef, {
-                    subject: subjectName,
-                    week: parseInt(weekNumber),
-                    maxAttendees: parseInt(maxAttendees),
-                    email: email,
-                    location: location,
-                    roster: rosterData,
-                    createdAt: new Date().toISOString(),
-                    attendees: {}
-                });
-
-                // Update subject record if first session
-                if (isFirstSession) {
-                    await set(ref(database, `subjects/${subjectName}`), {
-                        firstSessionDate: new Date().toISOString(),
-                        email: email
-                    });
-                }
-
-                // Generate QR Code
-                const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
-                const qr = qrcode(0, 'L');
-                qr.addData(formUrl);
-                qr.make();
-
-                // Update UI
-                document.getElementById('qrcode').innerHTML = qr.createImgTag(5);
-                document.getElementById('sessionUrl').value = formUrl;
-                document.getElementById('activeSubject').textContent = subjectName;
-                document.getElementById('activeWeek').textContent = weekNumber;
-                document.getElementById('maxAttendees').textContent = maxAttendees;
-                
-                // Show active session section
-                document.getElementById('activeSession').classList.remove('hidden');
-                
-                // Hide session form
-                document.getElementById('sessionForm').reset();
-                document.getElementById('createSessionBtn').disabled = true;
-
-                showMessage('Session created successfully!', 'success');
-
-                // Start monitoring attendees
-                const attendeesRef = ref(database, `sessions/${sessionId}/attendees`);
-                onValue(attendeesRef, (snapshot) => {
-                    const count = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
-                    document.getElementById('attendeeCount').textContent = count;
-                });
-
-            } catch (error) {
-                console.error('Error creating session:', error);
-                showMessage('Error creating session. Please try again.', 'danger');
-            }
-        });
-
-        // Handle location checkbox
-        document.getElementById('useLocation').addEventListener('change', (e) => {
-            const locationSettings = document.getElementById('locationSettings');
-            const setLocationBtn = document.getElementById('setLocationBtn');
-            
-            locationSettings.classList.toggle('hidden', !e.target.checked);
-            setLocationBtn.style.display = e.target.checked ? 'inline-flex' : 'none';
-
-            if (e.target.checked) {
-                // Populate saved locations
-                const select = document.getElementById('savedLocations');
-                select.innerHTML = '<option value="">Select a saved location</option>';
-                Object.keys(savedLocations).forEach(name => {
-                    select.innerHTML += `<option value="${name}">${name}</option>`;
-                });
-            }
-        });
-
-        // Copy URL functionality
-        document.getElementById('copyUrl').addEventListener('click', () => {
-            const urlInput = document.getElementById('sessionUrl');
-            urlInput.select();
-            document.execCommand('copy');
-            showMessage('URL copied to clipboard!', 'success');
-        });
-
-        // Helper function to show messages
-        function showMessage(text, type) {
-            const message = document.getElementById('message');
-            message.className = `alert alert-${type}`;
-            message.textContent = text;
-            message.style.display = 'block';
-            
-            setTimeout(() => {
-                message.style.display = 'none';
-            }, 3000);
-        }
-
-        // Make functions available globally
-        window.showMessage = showMessage;
-    </script>
 </body>
 </html>
