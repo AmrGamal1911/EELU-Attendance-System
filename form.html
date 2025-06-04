@@ -614,8 +614,10 @@
             },
 
             submitAttendance: async function() {
+                const submitBtn = document.getElementById('submitBtn');
+                const form = document.getElementById('attendanceForm');
+                
                 try {
-                    const submitBtn = document.getElementById('submitBtn');
                     submitBtn.disabled = true;
                     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
@@ -627,7 +629,7 @@
                     const password = document.getElementById('password').value;
 
                     // Validate password if required
-                if (this.sessionData.password && password !== this.sessionData.password) {
+                    if (this.sessionData.password && password !== this.sessionData.password) {
                         throw new Error('Incorrect session password');
                     }
 
@@ -697,16 +699,32 @@
                         throw new Error('Failed to save attendance record');
                     }
 
+                    // Show success message
                     this.showMessage('✅ Attendance recorded successfully!', 'success');
-                    document.getElementById('attendanceForm').reset();
+                    
+                    // Update UI to show completion
+                    form.reset();
                     submitBtn.innerHTML = '<i class="fas fa-check"></i> Attendance Recorded';
                     submitBtn.style.background = 'var(--success)';
+                    submitBtn.disabled = true;
                     
                     // Disable form inputs
                     document.getElementById('student_id').disabled = true;
                     if (document.getElementById('password')) {
                         document.getElementById('password').disabled = true;
                     }
+                    
+                    // Show completion message
+                    const messageDiv = document.getElementById('message');
+                    messageDiv.innerHTML = `
+                        <div style="text-align: center;">
+                            <i class="fas fa-check-circle" style="font-size: 3rem; color: var(--success); margin-bottom: 1rem;"></i>
+                            <h3>Attendance Recorded Successfully!</h3>
+                            <p>You can now close this page.</p>
+                        </div>
+                    `;
+                    messageDiv.className = 'alert alert-success';
+                    messageDiv.style.display = 'block';
                     
                 } catch (error) {
                     console.error('Attendance submission error:', error);
@@ -774,7 +792,7 @@
                         });
                         return;
                     }
-
+                    
                     this.showMessage('Verifying your location...', 'info');
                     
                     // Get student's location and verify distance
@@ -911,7 +929,7 @@
                     document.getElementById('submitBtn').disabled = false;
                     return;
                 }
-
+                
                 try {
                     const locationResult = await this.verifyLocation();
                     console.log('Location check result:', locationResult.success ? 'Success' : 'Failed');
@@ -1147,6 +1165,12 @@
         document.addEventListener('DOMContentLoaded', () => {
             console.log('DOM loaded, initializing form...');
             formApp.init();
+            
+            // Add form submission handler
+            document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
+                e.preventDefault(); // Prevent form from submitting normally
+                await formApp.submitAttendance();
+            });
             
             // Clean up when page is closed
             window.addEventListener('beforeunload', () => {
