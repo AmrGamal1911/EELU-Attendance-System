@@ -633,7 +633,6 @@
                 return new Promise((resolve) => {
                     console.log('Starting verification process...');
                     
-                    // First check if we have the current IP
                     if (!this.currentIP) {
                         console.log('No IP address available');
                         document.getElementById('submitBtn').disabled = true;
@@ -646,7 +645,6 @@
                     }
 
                     // Step 1: Check if current IP matches TA's IP
-                    console.log('Checking TA IP match - Current:', this.currentIP, 'TA:', this.sessionData.taIP);
                     if (this.currentIP === this.sessionData.taIP) {
                         console.log('TA IP match confirmed - enabling submit button');
                         const submitBtn = document.getElementById('submitBtn');
@@ -666,9 +664,6 @@
                     }
 
                     // Step 2: If not TA's IP, verify student location
-                    console.log('Not TA device - proceeding with student location verification');
-                    
-                    // Check if location verification is possible
                     if (!this.sessionData.classLocation) {
                         console.log('No class location set');
                         document.getElementById('submitBtn').disabled = true;
@@ -693,7 +688,6 @@
 
                     this.showMessage('Verifying your location...', 'info');
                     
-                    // Get student's location and verify distance
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
                             const studentLat = position.coords.latitude;
@@ -701,7 +695,6 @@
                             const classLat = this.sessionData.classLocation.lat;
                             const classLng = this.sessionData.classLocation.lng;
                             
-                            // Calculate distance
                             const distance = this.calculateDistance(
                                 studentLat, studentLng,
                                 classLat, classLng
@@ -729,24 +722,46 @@
                             
                             const isWithinRange = distance <= totalAllowedDistance;
                             const submitBtn = document.getElementById('submitBtn');
+                            submitBtn.disabled = !isWithinRange;
+
+                            // Create location status message
+                            const locationStatus = document.createElement('div');
+                            locationStatus.className = `alert ${isWithinRange ? 'alert-success' : 'alert-danger'}`;
+                            locationStatus.style.marginBottom = '1rem';
                             
                             if (isWithinRange) {
-                                console.log('Student within range - enabling submit button');
-                                submitBtn.disabled = false;
-                                resolve({ 
-                                    success: true,
-                                    message: `Location verified (${Math.round(distance)}m from class)`,
-                                    locationData: locationData
-                                });
+                                locationStatus.innerHTML = `
+                                    <i class="fas fa-check-circle"></i> 
+                                    Location verified (${Math.round(distance)}m from class)
+                                `;
                             } else {
-                                console.log('Student out of range - disabling submit button');
-                                submitBtn.disabled = true;
-                                resolve({ 
-                                    success: false,
-                                    message: `You are ${Math.round(distance)}m from the class location. Maximum allowed distance is ${maxDistance}m (plus ${accuracyBuffer}m accuracy buffer).`,
-                                    locationData: locationData
-                                });
+                                locationStatus.innerHTML = `
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    <strong>You are too far from the class location!</strong><br>
+                                    - Current distance: ${Math.round(distance)}m<br>
+                                    - Maximum allowed: ${maxDistance}m<br>
+                                    - Location accuracy: ±${Math.round(accuracyBuffer)}m<br>
+                                    <strong class="text-red-500">Please move closer to submit attendance.</strong>
+                                `;
                             }
+
+                            // Update or add location status to form
+                            const existingStatus = document.getElementById('locationStatus');
+                            if (existingStatus) {
+                                existingStatus.replaceWith(locationStatus);
+                            } else {
+                                const form = document.getElementById('attendanceForm');
+                                form.insertBefore(locationStatus, submitBtn);
+                            }
+                            locationStatus.id = 'locationStatus';
+
+                            resolve({ 
+                                success: isWithinRange,
+                                message: isWithinRange ? 
+                                    `Location verified (${Math.round(distance)}m from class)` :
+                                    `You are ${Math.round(distance)}m from class. Maximum allowed is ${maxDistance}m.`,
+                                locationData: locationData
+                            });
                         },
                         (error) => {
                             console.error('Location error:', error);
