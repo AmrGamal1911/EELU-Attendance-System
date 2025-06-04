@@ -1632,6 +1632,36 @@
                     this.currentSessions = this.currentSessions.filter(s => s.id !== sessionId);
                 }
                 
+                // Set up Firebase listeners first
+                const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
+                window.dbOnValue(attendeesRef, (snapshot) => {
+                    const attendees = snapshot.val() || {};
+                    const attendeeList = Object.values(attendees);
+                    sessionData.attendees = attendeeList;
+                    sessionData.attendeeCount = attendeeList.length;
+                    
+                    // Update attendance count and progress
+                    const attendedCount = document.getElementById(`attendedCount_${sessionId}`);
+                    const progressFill = document.getElementById(`progressFill_${sessionId}`);
+                    const maxAttendeesDisplay = document.getElementById(`maxAttendeesDisplay_${sessionId}`);
+                    
+                    if (attendedCount && progressFill && maxAttendeesDisplay) {
+                        attendedCount.textContent = attendeeList.length;
+                        maxAttendeesDisplay.textContent = sessionData.maxAttendees;
+                        const percentage = (attendeeList.length / sessionData.maxAttendees) * 100;
+                        progressFill.style.width = `${percentage}%`;
+                    }
+                    
+                    // Update attendance list
+                    this.updateAttendanceList(sessionData);
+                    
+                    // Update session history
+                    this.updateSessionHistory();
+                    
+                    // Save to local storage
+                    this.saveSessionToLocal(sessionData);
+                });
+                
                 const sessionCard = document.createElement('div');
                 sessionCard.className = 'card session-card';
                 sessionCard.id = `sessionCard_${sessionId}`;
@@ -1718,26 +1748,6 @@
                 qr.make();
                 document.getElementById(`qrcode_${sessionId}`).innerHTML = qr.createImgTag(5);
                 document.getElementById(`sessionUrl_${sessionId}`).value = formUrl;
-                
-                // Set up Firebase listeners
-                const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
-                window.dbOnValue(attendeesRef, (snapshot) => {
-                    // Update connected status immediately when we get data
-                    const syncIndicator = document.getElementById(`syncIndicator_${sessionId}`);
-                    const syncStatus = document.getElementById(`syncStatus_${sessionId}`);
-                    if (syncIndicator && syncStatus) {
-                        syncIndicator.className = 'sync-indicator connected';
-                        syncStatus.textContent = 'Connected';
-                    }
-                    
-                    // Rest of the attendance handling code
-                    const attendees = snapshot.val() || {};
-                    const attendeeList = Object.values(attendees);
-                    sessionData.attendees = attendeeList;
-                    sessionData.attendeeCount = attendeeList.length;
-                    this.updateSessionDisplay(sessionData);
-                    this.saveSessionToLocal(sessionData);
-                });
             },
 
             showStudentQRCodes: function(sessionId) {
@@ -2197,9 +2207,11 @@
             },
 
             updateSessionHistory: function() {
-                const historyDiv = document.getElementById('sessionHistory');
-                if (!this.currentSessions || this.currentSessions.length === 0) {
-                    historyDiv.innerHTML = `
+                const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
+                const historyList = document.getElementById('sessionHistoryList');
+                
+                if (!history.length) {
+                    historyList.innerHTML = `
                         <div class="empty-state">
                             <i class="fas fa-history"></i>
                             <p>No previous sessions</p>
@@ -2208,60 +2220,40 @@
                     return;
                 }
                 
-                const sessionsHtml = this.currentSessions
-                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-                    .map(session => {
-                        const attendeeCount = session.attendees ? Object.keys(session.attendees).length : 0;
-                        const maxAttendees = session.roster ? session.roster.length : 0;
-                        const timestamp = new Date(session.timestamp).toLocaleString();
-                        const isActive = session.active;
-                        const statusClass = isActive ? 'active' : 'ended';
-
-                        return `
-                            <div class="session-item ${statusClass}">
-                                <div class="session-header">
-                                    <h3>${session.subject} - Week ${session.week}</h3>
-                                    <span class="timestamp">${timestamp}</span>
+                const historyHtml = history.map(session => {
+                    const isActive = session.active;
+                    return `
+                        <div class="session-item ${isActive ? 'active' : ''}">
+                            <div class="session-header">
+                                <h3>${session.subject} - Week ${session.week}</h3>
+                                <span class="timestamp">${new Date(session.date).toLocaleString()}</span>
                             </div>
-                                <div class="session-info">
-                                    <span class="attendance-count">
-                                        <i class="fas fa-users"></i> ${attendeeCount}/${maxAttendees} students
-                                    </span>
-                        <div class="session-actions">
-                                        ${isActive ? `
-                                            <button onclick="app.showQRCode('${session.id}')" class="btn btn-primary btn-sm">
-                                                <i class="fas fa-qrcode"></i> Show QR
-                            </button>
-                                            <button onclick="app.endSession('${session.id}')" class="btn btn-danger btn-sm">
-                                                <i class="fas fa-stop-circle"></i> End
-                            </button>
-                                        ` : `
-                                            <button onclick="app.exportAttendanceReport('${session.id}')" class="btn btn-secondary btn-sm">
-                                                <i class="fas fa-download"></i> Export
-                            </button>
-                                        `}
+                            <div class="session-info">
+                                <span class="attendance-count">
+                                    <i class="fas fa-users"></i> ${session.attendees}/${session.maxAttendees} students
+                                </span>
+                                <div class="session-actions">
+                                    ${isActive ? `
+                                        <button onclick="attendanceApp.openFullscreenQR('${session.id}')" class="btn btn-secondary btn-sm">
+                                            <i class="fas fa-qrcode"></i> QR Code
+                                        </button>
+                                        <button onclick="attendanceApp.copyToClipboard('${session.id}')" class="btn btn-secondary btn-sm">
+                                            <i class="fas fa-link"></i> Copy Link
+                                        </button>
+                                        <button onclick="attendanceApp.endSession('${session.id}')" class="btn btn-danger btn-sm">
+                                            <i class="fas fa-stop-circle"></i> End
+                                        </button>
+                                    ` : ''}
+                                    <button onclick="attendanceApp.exportAttendanceReport('${session.id}')" class="btn btn-success btn-sm">
+                                        <i class="fas fa-download"></i> Export
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                                ${isActive ? `
-                                    <div id="attendanceList_${session.id}" class="attendance-list">
-                                        <div class="loading-attendance">
-                                            <div class="spinner"></div>
-                                            <p>Loading attendance...</p>
-                                        </div>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `;
-                    }).join('');
-
-                historyDiv.innerHTML = sessionsHtml;
+                    `;
+                }).join('');
                 
-                // Update attendance lists for active sessions
-                this.currentSessions.forEach(session => {
-                    if (session.active) {
-                        this.setupAttendanceListener(session.id);
-                    }
-                });
+                historyList.innerHTML = historyHtml;
             },
 
             setupAttendanceListener: function(sessionId) {
