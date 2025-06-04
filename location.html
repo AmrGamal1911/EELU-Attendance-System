@@ -27,10 +27,12 @@
 
         window.sendLocationToFirebase = async function(location, sessionId) {
             try {
-                const locationRef = ref(database, `temp-locations/${sessionId}`);
+                const locationRef = ref(database, `sessions/${sessionId}/classLocation`);
                 await set(locationRef, {
-                    ...location,
-                    timestamp: Date.now()
+                    lat: location.lat,
+                    lng: location.lng,
+                    accuracy: location.accuracy,
+                    timestamp: location.timestamp
                 });
                 return true;
             } catch (error) {
@@ -259,7 +261,6 @@
         async function getLocation() {
             const spinner = document.getElementById('spinner');
             const button = document.getElementById('getLocationBtn');
-            const locationStatus = document.getElementById('locationStatus');
             
             if (!navigator.geolocation) {
                 showMessage('Geolocation is not supported by your browser', 'danger');
@@ -286,26 +287,23 @@
                     timestamp: new Date().toISOString()
                 };
 
+                console.log('Location data:', locationData); // Debug log
+
                 // Send location to Firebase
                 if (await window.sendLocationToFirebase(locationData, sessionId)) {
                     showMessage('Location set successfully!', 'success');
                     
                     // Update UI - safely
+                    const locationStatus = document.getElementById('locationStatus');
                     if (locationStatus) {
                         locationStatus.innerHTML = `
-                            <div class="alert alert-success">
-                                <p><strong>Location acquired:</strong></p>
+                            <div class="alert alert-success" style="display: block;">
+                                <p><strong>Location set successfully:</strong></p>
                                 <p>Latitude: ${locationData.lat.toFixed(6)}</p>
                                 <p>Longitude: ${locationData.lng.toFixed(6)}</p>
                                 <p>Accuracy: ±${Math.round(locationData.accuracy)}m</p>
                             </div>
                         `;
-                    }
-                    
-                    // Show location name form
-                    const locationNameForm = document.getElementById('locationNameForm');
-                    if (locationNameForm) {
-                        locationNameForm.classList.remove('hidden');
                     }
                 } else {
                     throw new Error('Failed to save location data');
