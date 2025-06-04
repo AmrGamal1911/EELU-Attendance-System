@@ -602,21 +602,30 @@
                 try {
                     if (!this.sessionData || !this.sessionData.active) {
                         this.showMessage('Session is not active', 'danger');
-                    return;
-                }
+                        return;
+                    }
+
+                    // Disable submit button while processing
+                    const submitBtn = document.getElementById('submitBtn');
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
                     const studentId = document.getElementById('student_id').value.trim();
                     const password = document.getElementById('password').value;
 
-                if (this.sessionData.password && password !== this.sessionData.password) {
+                    if (this.sessionData.password && password !== this.sessionData.password) {
                         this.showMessage('Incorrect session password', 'danger');
-                    return;
-                }
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
+                        return;
+                    }
 
                     // Check if student exists in roster
                     const student = this.sessionData.roster.find(s => s.id === studentId);
                     if (!student) {
                         this.showMessage('Student ID not found in roster', 'danger');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
                         return;
                     }
 
@@ -624,6 +633,8 @@
                     const existingAttendee = Object.values(this.sessionData.attendees || {}).find(a => a.id === studentId);
                     if (existingAttendee) {
                         this.showMessage('Attendance already recorded for this ID', 'danger');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
                         return;
                     }
 
@@ -632,8 +643,12 @@
                         const locationResult = await this.verifyLocation();
                         if (!locationResult.success) {
                             this.showMessage(locationResult.message, 'danger');
-                        return;
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
+                            return;
                         }
+                        // Show success message for location
+                        this.showMessage(locationResult.message, 'success');
                     }
 
                     // Record attendance
@@ -653,11 +668,20 @@
                     await window.dbPush(this.attendeesRef, attendanceData);
                     this.showMessage('✅ Attendance recorded successfully!', 'success');
                     document.getElementById('attendanceForm').reset();
-                    document.getElementById('submitBtn').disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-check"></i> Attendance Recorded';
+                    submitBtn.style.background = 'var(--success)';
+                    
+                    // Disable form inputs
+                    document.getElementById('student_id').disabled = true;
+                    if (document.getElementById('password')) {
+                        document.getElementById('password').disabled = true;
+                    }
                     
                 } catch (error) {
                     console.error('Attendance submission error:', error);
                     this.showMessage('Failed to submit attendance: ' + error.message, 'danger');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
                 }
             },
 
@@ -675,6 +699,9 @@
                         });
                         return;
                     }
+                    
+                    // Show location checking message
+                    this.showMessage('Checking your location...', 'info');
                     
                     const handleLocationError = (error) => {
                         console.error('Location error:', error);
@@ -724,14 +751,14 @@
                             } else {
                                 resolve({ 
                                     success: false,
-                                    message: `Too far from class location (${distance.toFixed(0)}m away, max ${maxDistance}m)`
+                                    message: `Too far from class location (${distance.toFixed(0)}m away, max ${maxDistance}m allowed)`
                                 });
                             }
                         },
                         handleLocationError,
                         { 
                             enableHighAccuracy: true, 
-                            timeout: 10000,
+                            timeout: 15000, // Increased timeout
                             maximumAge: 0
                         }
                     );
