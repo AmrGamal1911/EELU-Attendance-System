@@ -407,6 +407,18 @@
                 this.updateConnectionStatus('connecting');
                 
                 try {
+                    // Get current IP first
+                    console.log('Fetching IP address...');
+                    try {
+                        const ipResponse = await fetch('https://api.ipify.org?format=json');
+                        const ipData = await ipResponse.json();
+                        this.currentIP = ipData.ip;
+                        console.log('Current IP fetched:', this.currentIP);
+                } catch (error) {
+                        console.warn('Could not get IP:', error);
+                        this.currentIP = 'unknown';
+                    }
+
                     console.log('Fetching session data...');
                     const sessionSnapshot = await window.dbGet(window.dbRef(window.database, `sessions/${sessionId}`));
                     this.sessionData = sessionSnapshot.val();
@@ -434,16 +446,6 @@
                         document.getElementById('submitBtn').disabled = false;
                     }
                     
-                    // Get current IP
-                    try {
-                        const ipResponse = await fetch('https://api.ipify.org?format=json');
-                        const ipData = await ipResponse.json();
-                        this.currentIP = ipData.ip;
-                } catch (error) {
-                        console.warn('Could not get IP:', error);
-                        this.currentIP = 'unknown';
-                    }
-
                     // Set up Firebase references
                     this.sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
                     this.attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
@@ -454,10 +456,10 @@
                     document.getElementById('maxAttendees').textContent = this.sessionData.maxAttendees;
                     
                     // Show password field if required
-                    if (this.sessionData.password) {
-                        document.getElementById('passwordField').classList.remove('hidden');
-                    }
-                    
+                        if (this.sessionData.password) {
+                            document.getElementById('passwordField').classList.remove('hidden');
+                        }
+
                     // Set up real-time listeners
                     this.setupRealtimeListeners();
                     
@@ -466,9 +468,9 @@
                     document.getElementById('activeSession').classList.remove('hidden');
                     
                     // Update connection status
-                        this.updateConnectionStatus('connected');
-                        
-                } catch (error) {
+                    this.updateConnectionStatus('connected');
+
+                    } catch (error) {
                     console.error('Session initialization error:', error);
                     this.handleInitializationError(error);
                 }
@@ -530,8 +532,8 @@
                         isFull: attendeeList.length >= this.sessionData.maxAttendees
                     });
                     
-                    this.sessionData.attendees = attendeeList;
-                    this.updateAttendanceCount();
+                        this.sessionData.attendees = attendeeList;
+                        this.updateAttendanceCount();
                     
                     // Check if session is full
                     if (attendeeList.length >= this.sessionData.maxAttendees) {
@@ -716,27 +718,25 @@
 
             verifyLocation: async function() {
                 return new Promise((resolve) => {
-                    if (!this.sessionData.classLocation) {
+                    console.log('Starting verification process...');
+                    
+                    // First check if we have the current IP
+                    if (!this.currentIP) {
+                        console.log('No IP address available');
                         resolve({ 
                             success: false, 
-                            message: 'No class location has been set by the instructor',
+                            message: 'Unable to verify device identity',
                             locationData: null 
                         });
                         return;
                     }
 
-                    console.log('Verifying location - Current IP:', this.currentIP, 'TA IP:', this.sessionData.taIP);
-                    
-                    // Check if current IP matches TA's IP
+                    // Step 1: Check if current IP matches TA's IP
+                    console.log('Checking TA IP match - Current:', this.currentIP, 'TA:', this.sessionData.taIP);
                     if (this.currentIP === this.sessionData.taIP) {
-                        console.log('TA IP match detected - enabling submit button');
+                        console.log('TA IP match confirmed - enabling submit button');
                         const submitBtn = document.getElementById('submitBtn');
                         submitBtn.disabled = false;
-                        
-                        // Force enable after a small delay to ensure it takes effect
-                        setTimeout(() => {
-                            submitBtn.disabled = false;
-                        }, 100);
                         
                         resolve({
                             success: true,
@@ -751,7 +751,22 @@
                         return;
                     }
 
+                    // Step 2: If not TA's IP, verify student location
+                    console.log('Not TA device - proceeding with student location verification');
+                    
+                    // Check if location verification is possible
+                    if (!this.sessionData.classLocation) {
+                        console.log('No class location set');
+                        resolve({ 
+                            success: false, 
+                            message: 'No class location has been set by the instructor',
+                            locationData: null 
+                        });
+                        return;
+                    }
+
                     if (!navigator.geolocation) {
+                        console.log('Geolocation not supported');
                         resolve({ 
                             success: false,
                             message: 'Your browser does not support location services. Please use a modern browser.',
@@ -762,6 +777,7 @@
 
                     this.showMessage('Verifying your location...', 'info');
                     
+                    // Get student's location and verify distance
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
                             const studentLat = position.coords.latitude;
@@ -775,7 +791,8 @@
                                 classLat, classLng
                             );
 
-                            // Create standardized location object
+                            console.log('Location check - Distance:', Math.round(distance), 'meters');
+
                             const locationData = {
                                 coordinates: {
                                     latitude: studentLat,
@@ -790,13 +807,15 @@
                                 }
                             };
 
-                            // Add accuracy buffer to max distance
                             const maxDistance = this.sessionData.locationDistance || 50;
                             const accuracyBuffer = Math.min(position.coords.accuracy, 20);
                             const totalAllowedDistance = maxDistance + accuracyBuffer;
                             
                             const isWithinRange = distance <= totalAllowedDistance;
-                            document.getElementById('submitBtn').disabled = !isWithinRange; // Update button state
+                            const submitBtn = document.getElementById('submitBtn');
+                            submitBtn.disabled = !isWithinRange;
+                            
+                            console.log('Location verification result:', isWithinRange ? 'Within range' : 'Out of range');
 
                             if (isWithinRange) {
                                 resolve({ 
@@ -814,6 +833,7 @@
                         },
                         (error) => {
                             console.error('Location error:', error);
+                            document.getElementById('submitBtn').disabled = true;
                             resolve({ 
                                 success: false,
                                 message: this.getLocationErrorMessage(error),
@@ -885,22 +905,19 @@
             },
 
             startLocationCheck: async function() {
+                console.log('Starting location verification process');
                 if (!this.sessionData.useLocation) {
-                    document.getElementById('submitBtn').disabled = false; // Enable if location not required
+                    console.log('Location verification not required');
+                    document.getElementById('submitBtn').disabled = false;
                     return;
                 }
 
-                if (!navigator.geolocation) {
-                    this.showMessage('Your browser does not support location services', 'danger');
-                    return;
-                }
-                
                 try {
                     const locationResult = await this.verifyLocation();
+                    console.log('Location check result:', locationResult.success ? 'Success' : 'Failed');
                     
                     if (locationResult.success) {
                         this.showMessage(locationResult.message, 'success');
-                        document.getElementById('submitBtn').disabled = false;
                     } else {
                         this.showMessage(locationResult.message, 'danger');
                         document.getElementById('submitBtn').disabled = true;
