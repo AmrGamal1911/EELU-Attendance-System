@@ -543,22 +543,164 @@
         }
         
         .session-item {
-            padding: 1rem;
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             border: 1px solid #e5e7eb;
-            border-radius: var(--border-radius);
-            margin-bottom: 1rem;
+        }
+
+        .session-item.active {
+            border-left: 4px solid var(--success);
+        }
+
+        .session-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 1rem;
         }
-        
-        .session-item:hover {
-            background-color: #f8fafc;
+
+        .session-header h3 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 1.25rem;
         }
-        
+
+        .timestamp {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .session-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .attendance-count {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #374151;
+        }
+
         .session-actions {
             display: flex;
             gap: 0.5rem;
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .attendance-list {
+            margin-top: 1rem;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 1rem;
+        }
+
+        .attendee-entry {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .attendee-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .attendee-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .attendee-info .id {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .attendee-info .section {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .attendance-time {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .ip-warning {
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            background: rgba(251, 191, 36, 0.1);
+            border-radius: 6px;
+            color: #92400e;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .location-status {
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .location-status.verified {
+            background: rgba(16, 185, 129, 0.1);
+            color: #047857;
+        }
+
+        .location-status.unverified {
+            background: rgba(239, 68, 68, 0.1);
+            color: #b91c1c;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        .empty-state i {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .loading-attendance {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+        }
+
+        .loading-attendance .spinner {
+            margin: 0 auto 1rem;
+        }
+
+        .empty-attendance {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+        }
+
+        .empty-attendance i {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
         }
         
         .voice-btn {
@@ -2059,264 +2201,168 @@
                 this.renderSessionHistory();
             },
 
-            updateSessionHistory: function(updatedSession) {
-                const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
-                const sessionIndex = history.findIndex(s => s.id === updatedSession.id);
-                
-                if (sessionIndex !== -1) {
-                    history[sessionIndex].attendees = updatedSession.attendeeCount || 0;
-                    history[sessionIndex].active = updatedSession.active;
-                    localStorage.setItem('sessionHistory', JSON.stringify(history));
-                    this.renderSessionHistory();
-                }
-            },
-
-            loadSessionHistory: function() {
-                this.renderSessionHistory();
-            },
-
-            renderSessionHistory: function() {
-                const historyList = document.getElementById('sessionHistoryList');
-                const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]')
-                    .filter(session => session.deviceId === this.deviceId);
-                
-                if (history.length === 0) {
-                    historyList.innerHTML = '<p>No previous sessions found</p>';
-                    document.getElementById('sessionHistoryCard').classList.add('hidden');
+            updateSessionHistory: function() {
+                const historyDiv = document.getElementById('sessionHistory');
+                if (!this.currentSessions || this.currentSessions.length === 0) {
+                    historyDiv.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-history"></i>
+                            <p>No previous sessions</p>
+                        </div>
+                    `;
                     return;
                 }
-                
-                historyList.innerHTML = history.map(session => `
-                    <div class="session-item">
-                        <div>
-                            <strong>${session.subject}</strong> - Week ${session.week}
-                            <div class="text-sm text-gray-500">
-                                ${new Date(session.date).toLocaleString()} | 
-                                ${session.attendees}/${session.maxAttendees} students
-                                ${session.active ? '<span class="text-green-500">(Active)</span>' : ''}
+
+                const sessionsHtml = this.currentSessions
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                    .map(session => {
+                        const attendeeCount = session.attendees ? Object.keys(session.attendees).length : 0;
+                        const maxAttendees = session.roster ? session.roster.length : 0;
+                        const timestamp = new Date(session.timestamp).toLocaleString();
+                        const isActive = session.active;
+                        const statusClass = isActive ? 'active' : 'ended';
+
+                        return `
+                            <div class="session-item ${statusClass}">
+                                <div class="session-header">
+                                    <h3>${session.subject} - Week ${session.week}</h3>
+                                    <span class="timestamp">${timestamp}</span>
+                                </div>
+                                <div class="session-info">
+                                    <span class="attendance-count">
+                                        <i class="fas fa-users"></i> ${attendeeCount}/${maxAttendees} students
+                                    </span>
+                                    <div class="session-actions">
+                                        ${isActive ? `
+                                            <button onclick="app.showQRCode('${session.id}')" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-qrcode"></i> Show QR
+                                            </button>
+                                            <button onclick="app.endSession('${session.id}')" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-stop-circle"></i> End
+                                            </button>
+                                        ` : `
+                                            <button onclick="app.exportAttendanceReport('${session.id}')" class="btn btn-secondary btn-sm">
+                                                <i class="fas fa-download"></i> Export
+                                            </button>
+                                        `}
+                                    </div>
+                                </div>
+                                ${isActive ? `
+                                    <div id="attendanceList_${session.id}" class="attendance-list">
+                                        <div class="loading-attendance">
+                                            <div class="spinner"></div>
+                                            <p>Loading attendance...</p>
+                                        </div>
+                                    </div>
+                                ` : ''}
                             </div>
+                        `;
+                    }).join('');
+
+                historyDiv.innerHTML = sessionsHtml;
+                
+                // Update attendance lists for active sessions
+                this.currentSessions.forEach(session => {
+                    if (session.active) {
+                        this.setupAttendanceListener(session.id);
+                    }
+                });
+            },
+
+            setupAttendanceListener: function(sessionId) {
+                const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
+                window.dbOnValue(attendeesRef, (snapshot) => {
+                    const attendees = snapshot.val() || {};
+                    const session = this.currentSessions.find(s => s.id === sessionId);
+                    if (session) {
+                        session.attendees = attendees;
+                        this.updateAttendanceList(session);
+                        this.updateSessionDisplay(session);
+                    }
+                });
+            },
+
+            updateSessionDisplay: function(session) {
+                const sessionElement = document.querySelector(`.session-item[data-id="${session.id}"]`);
+                if (sessionElement) {
+                    const attendeeCount = session.attendees ? Object.keys(session.attendees).length : 0;
+                    const maxAttendees = session.roster ? session.roster.length : 0;
+                    const countElement = sessionElement.querySelector('.attendance-count');
+                    if (countElement) {
+                        countElement.innerHTML = `<i class="fas fa-users"></i> ${attendeeCount}/${maxAttendees} students`;
+                    }
+                }
+            },
+
+            updateAttendanceList: function(session) {
+                const listDiv = document.getElementById(`attendanceList_${session.id}`);
+                if (!listDiv) return;
+
+                const attendees = Object.values(session.attendees || {});
+                if (attendees.length === 0) {
+                    listDiv.innerHTML = `
+                        <div class="empty-attendance">
+                            <i class="fas fa-user-clock"></i>
+                            <p>Waiting for students...</p>
                         </div>
-                        <div class="session-actions">
-                            <button onclick="attendanceApp.generateSessionQR('${session.id}')" class="btn btn-secondary" title="QR Code">
-                                <i class="fas fa-qrcode"></i>
-                            </button>
-                            <button onclick="attendanceApp.copySessionLink('${session.id}')" class="btn btn-secondary" title="Copy Link">
-                                <i class="fas fa-link"></i>
-                            </button>
-                            <button onclick="attendanceApp.downloadSessionReport('${session.id}')" class="btn btn-secondary" title="Download Report">
-                                <i class="fas fa-download"></i>
-                            </button>
-                            ${session.active ? `
-                                <button onclick="attendanceApp.endSession('${session.id}')" class="btn btn-danger" title="End Session">
-                                    <i class="fas fa-stop-circle"></i>
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-                `).join('');
-                
-                document.getElementById('sessionHistoryCard').classList.remove('hidden');
-            },
-
-            clearSessionHistory: function() {
-                localStorage.removeItem('sessionHistory');
-                this.renderSessionHistory();
-                this.showMessage('Session history cleared.', 'success');
-            },
-
-            generateSessionQR: function(sessionId) {
-                const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
-                const qr = qrcode(0, 'L');
-                qr.addData(formUrl);
-                qr.make();
-                
-                const qrContainer = document.getElementById('fullscreenQr');
-                qrContainer.innerHTML = qr.createImgTag(10);
-                document.getElementById('qrModal').style.display = 'flex';
-                document.body.style.overflow = 'hidden';
-            },
-
-            copySessionLink: function(sessionId) {
-                const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
-                navigator.clipboard.writeText(formUrl)
-                    .then(() => {
-                        this.showMessage('Session link copied to clipboard!', 'success');
-                    })
-                    .catch(err => {
-                        this.showMessage('Failed to copy link', 'danger');
-                        console.error('Could not copy text: ', err);
-                    });
-            },
-
-            downloadSessionReport: async function(sessionId) {
-                const sessions = JSON.parse(localStorage.getItem('sessions') || '{}');
-                const session = sessions[sessionId];
-                
-                if (!session) {
-                    this.showMessage('Session data not found', 'danger');
+                    `;
                     return;
                 }
-                
-                const roster = session.roster || [];
-                const attendees = session.attendees || [];
-                const week = session.week;
-                const subjectName = session.subject;
-                const allWeeks = [...(session.existingWeeks || []), week].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
-                
-                // Get token data
-                const tokensSnap = await window.dbGet(window.dbRef(window.database, `sessions/${sessionId}/tokens`));
-                const tokenMap = tokensSnap.val() || {};
-                
-                // Token flags
-                const tokenNotes = {};
-                Object.entries(tokenMap).forEach(([token, data]) => {
-                    if (data.flagged && data.secondStudentId) {
-                        tokenNotes[data.id] = `Same token with ${data.secondStudentId}`;
-                        tokenNotes[data.secondStudentId] = `Same token with ${data.id}`;
-                    }
-                });
 
-                // IP flags
-                const ipMap = {};
-                attendees.forEach(a => {
-                    if (!a.ip) return;
-                    if (!ipMap[a.ip]) ipMap[a.ip] = [];
-                    ipMap[a.ip].push(a.id);
-                });
-
-                const ipNotes = {};
-                Object.entries(ipMap).forEach(([ip, ids]) => {
-                    if (ids.length > 1) {
-                        ids.forEach(id => {
-                            ipNotes[id] = `Same IP with ${ids.filter(x => x !== id).join(', ')}`;
-                        });
-                    }
-                });
-
-                const data = [];
-                
-                if (session.existingWeeks?.length > 0) {
-                    roster.forEach(student => {
-                    const matched = attendees.find(a => a.id === student.id);
-                    const row = {
-                        'Student ID': student.id,
-                        'Name': student.name,
-                        'Section': student.section || ''
-                    };
-                    
-                    allWeeks.forEach(w => {
-                        if (w === week) {
-                            row[`Week ${w}`] = matched ? 1 : 0;
-                            row[`Timestamp Week ${w}`] = matched ? 
-                                    new Date(matched.timestamp).toLocaleString() : 'N/A';
-                        } else {
-                            row[`Week ${w}`] = student.weekData?.[w] || 0;
-                            row[`Timestamp Week ${w}`] = student[`Timestamp Week ${w}`] || 'N/A';
+                // Group attendees by IP
+                const ipGroups = {};
+                attendees.forEach(attendee => {
+                    const ip = attendee.deviceInfo?.ip;
+                    if (ip) {
+                        if (!ipGroups[ip]) {
+                            ipGroups[ip] = [];
                         }
-                    });
-                    
-                    row['Total Attendance'] = allWeeks.reduce((sum, w) => sum + (Number(row[`Week ${w}`]) || 0), 0);
-
-                    // Add IP note if applicable
-                        const ipNote = ipNotes[student.id] || '';
-                        
-                    // Add token note if applicable
-                        const tokenNote = tokenNotes[student.id] || '';
-                    
-                    // Combine notes
-                        row['Note'] = [ipNote, tokenNote].filter(Boolean).join(' | ');
-                    
-                    // Add flagged column if token was misused
-                    row['Flagged'] = tokenNote ? 'Yes' : '';
-                    
-                        data.push(row);
-                    });
-                } else {
-                    roster.forEach(student => {
-                        const matched = attendees.find(a => a.id === student.id);
-                        const row = {
-                            'Student ID': student.id,
-                            'Name': student.name,
-                            'Section': student.section || '',
-                            [`Week ${week}`]: matched ? 1 : 0,
-                            'Total Attendance': matched ? 1 : 0,
-                            [`Timestamp Week ${week}`]: matched ? 
-                                new Date(matched.timestamp).toLocaleString() : 'N/A'
-                        };
-
-                        // Add IP note if applicable
-                        const ipNote = ipNotes[student.id] || '';
-                        
-                        // Add token note if applicable
-                        const tokenNote = tokenNotes[student.id] || '';
-                        
-                        // Combine notes
-                        row['Note'] = [ipNote, tokenNote].filter(Boolean).join(' | ');
-                        
-                        // Add flagged column if token was misused
-                        row['Flagged'] = tokenNote ? 'Yes' : '';
-                        
-                        data.push(row);
-                    });
-                }
-                
-                // Add flagged submissions at the end
-                attendees.filter(a => a.flagged).forEach(flagged => {
-                    if (!data.some(r => r['Student ID'] === flagged.id)) {
-                        data.push({
-                            'Student ID': flagged.id,
-                            'Name': flagged.name || 'Flagged Submission',
-                            'Section': flagged.section || '',
-                            [`Week ${week}`]: 0,
-                            'Total Attendance': 0,
-                            [`Timestamp Week ${week}`]: new Date(flagged.timestamp).toLocaleString(),
-                            'Note': flagged.note || 'Flagged submission',
-                            'Flagged': 'Yes'
-                        });
+                        ipGroups[ip].push(attendee);
                     }
                 });
-                
-                const columnOrder = ['Student ID', 'Name', 'Section'];
-                
-                allWeeks.forEach(week => {
-                    columnOrder.push(`Week ${week}`);
-                });
-                
-                columnOrder.push('Total Attendance');
-                
-                allWeeks.forEach(week => {
-                    columnOrder.push(`Timestamp Week ${week}`);
-                });
 
-                // Add Note and Flagged columns
-                columnOrder.push('Note');
-                columnOrder.push('Flagged');
-                
-                const reorderedData = data.map(row => {
-                    const newRow = {};
-                    columnOrder.forEach(col => {
-                        if (row[col] !== undefined) {
-                            newRow[col] = row[col];
+                const attendeesHtml = attendees
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                    .map(attendee => {
+                        let warningHtml = '';
+                        const ip = attendee.deviceInfo?.ip;
+                        if (ip && ipGroups[ip].length > 1) {
+                            const otherStudents = ipGroups[ip]
+                                .filter(a => a.id !== attendee.id)
+                                .map(a => `${a.id} (${a.name})`)
+                                .join(', ');
+                            warningHtml = `
+                                <div class="ip-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Same IP as: ${otherStudents}
+                                </div>
+                            `;
                         }
-                    });
-                    return newRow;
-                });
-                
-                const ws = XLSX.utils.json_to_sheet(reorderedData);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-                
-                const today = new Date();
-                const dateStr = today.toISOString().split('T')[0];
-                let fileName;
-                
-                if (allWeeks.length > 1) {
-                    fileName = `${subjectName} Attendance from Week ${Math.min(...allWeeks)} to ${Math.max(...allWeeks)} ${dateStr}.xlsx`;
-                } else {
-                    fileName = `${subjectName} Attendance for Week ${week} ${dateStr}.xlsx`;
-                }
-                
-                XLSX.writeFile(wb, fileName);
+
+                        return `
+                            <div class="attendee-entry">
+                                <div class="attendee-main">
+                                    <div class="attendee-info">
+                                        <strong>${attendee.name}</strong>
+                                        <span class="id">${attendee.id}</span>
+                                        <span class="section">${attendee.section}</span>
+                                    </div>
+                                    <div class="attendance-time">
+                                        ${new Date(attendee.timestamp).toLocaleTimeString()}
+                                    </div>
+                                </div>
+                                ${warningHtml}
+                                ${attendee.location ? `
+                                    <div class="location-status ${attendee.location.verified ? 'verified' : 'unverified'}">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        ${attendee.location.verificationMessage}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }).join('');
+
+                listDiv.innerHTML = attendeesHtml;
             },
 
             initVoiceCommands: function() {
