@@ -2477,14 +2477,28 @@
                 // Verify origin for security
                 if (event.origin !== window.location.origin) return;
                 
-                const location = event.data;
-                if (location && location.lat && location.lng) {
-                    // Store the location
-                    this.classLocation = location;
+                const data = event.data;
+                if (data.type === 'location' && data.data) {
+                    const location = data.data;
+                    
+                    // Validate location data
+                    if (!location.lat || !location.lng || !location.accuracy) {
+                        this.showMessage('Invalid location data received', 'danger');
+                        return;
+                    }
+
+                    // Store the location with standardized format
+                    this.classLocation = {
+                        lat: location.lat,
+                        lng: location.lng,
+                        accuracy: Math.min(location.accuracy, 20), // Cap accuracy at 20m
+                        timestamp: location.timestamp || new Date().toISOString()
+                    };
                     
                     // Update location preview
+                    document.getElementById('locationPreview').style.display = 'block';
                     document.getElementById('locationPreview').textContent = 
-                        `Location coordinates: (${location.lat.toFixed(6)}, ${location.lng.toFixed(6)})`;
+                        `Location coordinates: (${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}) ±${Math.round(location.accuracy)}m`;
                     
                     // Hide spinner
                     document.querySelector('#locationStatus .spinner').style.display = 'none';
@@ -2518,7 +2532,7 @@
                 
                 if (!locationName) {
                     this.showMessage('Please enter a location name', 'danger');
-                    return;
+                            return;
                 }
                 
                 if (!this.classLocation) {
@@ -2526,28 +2540,39 @@
                     return;
                 }
                 
-                // Save to localStorage with device ID
-                const deviceId = localStorage.getItem('deviceId') || Date.now().toString();
-                const savedLocations = JSON.parse(localStorage.getItem(`savedLocations_${deviceId}`) || '{}');
-                savedLocations[locationName] = this.classLocation;
-                localStorage.setItem(`savedLocations_${deviceId}`, JSON.stringify(savedLocations));
-                
-                // Update location preview in the main form
-                document.getElementById('locationPreview').style.display = 'block';
-                document.getElementById('locationPreview').textContent = 
-                    `Location: ${locationName} (${this.classLocation.lat.toFixed(6)}, ${this.classLocation.lng.toFixed(6)})`;
-                
-                // Update location dropdown
-                this.updateLocationDropdown(locationName);
-                
-                // Close modal and reset form
-                document.getElementById('locationQRModal').classList.add('hidden');
-                document.getElementById('locationName').value = '';
-                document.getElementById('locationStatus').style.display = 'block';
-                document.getElementById('locationNameForm').classList.add('hidden');
-                
-                // Show success message
-                this.showMessage('Location saved successfully!', 'success');
+                try {
+                    // Save to localStorage with device ID
+                    const deviceId = localStorage.getItem('deviceId') || Date.now().toString();
+                    const savedLocations = JSON.parse(localStorage.getItem(`savedLocations_${deviceId}`) || '{}');
+                    
+                    // Save with standardized format
+                    savedLocations[locationName] = {
+                        ...this.classLocation,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    localStorage.setItem(`savedLocations_${deviceId}`, JSON.stringify(savedLocations));
+                    
+                    // Update location preview
+                    document.getElementById('locationPreview').style.display = 'block';
+                    document.getElementById('locationPreview').textContent = 
+                        `Location: ${locationName} (${this.classLocation.lat.toFixed(6)}, ${this.classLocation.lng.toFixed(6)}) ±${Math.round(this.classLocation.accuracy)}m`;
+                    
+                    // Update location dropdown
+                    this.updateLocationDropdown(locationName);
+                    
+                    // Show success message
+                    this.showMessage('Location saved successfully!', 'success');
+                    
+                    // Close modal and reset form
+                    document.getElementById('locationQRModal').classList.add('hidden');
+                    document.getElementById('locationName').value = '';
+                    document.getElementById('locationStatus').style.display = 'block';
+                    document.getElementById('locationNameForm').classList.add('hidden');
+                } catch (error) {
+                    console.error('Error saving location:', error);
+                    this.showMessage('Failed to save location: ' + error.message, 'danger');
+                }
             },
 
             updateLocationDropdown: function(selectedLocationName = null) {
@@ -2556,7 +2581,7 @@
                 const locationSelect = document.getElementById('locationSelect');
                 
                 if (!locationSelect) {
-                    return;
+                            return;
                 }
                 
                 // Clear existing options
@@ -2587,7 +2612,7 @@
                     document.getElementById('locationPreview').style.display = 'block';
                     document.getElementById('locationPreview').textContent = 
                         `Location: ${selectedName} (${this.classLocation.lat.toFixed(6)}, ${this.classLocation.lng.toFixed(6)})`;
-                } else {
+                        } else {
                     this.classLocation = null;
                     document.getElementById('locationPreview').style.display = 'none';
                 }
