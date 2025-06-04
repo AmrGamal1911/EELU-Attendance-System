@@ -296,10 +296,18 @@
                             <i class="fas fa-check-circle"></i> Location set successfully!
                         </div>
                     `;
-                    // Auto close after 2 seconds
+                    // Force close the page using multiple methods
                     setTimeout(() => {
-                        window.close();
-                    }, 2000);
+                        try {
+                            window.close();
+                            // If window.close() doesn't work, try other methods
+                            window.location.href = 'about:blank';
+                            history.back();
+                            window.location.replace('about:blank');
+                        } catch (e) {
+                            console.error('Error closing window:', e);
+                        }
+                    }, 1000);
                 } else {
                     throw new Error('Failed to save location');
                 }
