@@ -122,33 +122,6 @@
             100% { transform: rotate(360deg); }
         }
 
-        .form-group {
-            margin-bottom: 1.5rem;
-            text-align: left;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: #374151;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: var(--border-radius);
-            font-size: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
         .location-preview {
             background: #f9fafb;
             padding: 1rem;
@@ -157,10 +130,6 @@
             font-size: 0.9rem;
             color: #4b5563;
         }
-
-        #savedLocations {
-            margin-bottom: 2rem;
-        }
     </style>
 </head>
 <body>
@@ -168,90 +137,27 @@
         <h1><i class="fas fa-map-marker-alt"></i> Set Class Location</h1>
         
         <div id="message" class="alert hidden"></div>
-        
         <div id="spinner" class="spinner"></div>
-
-        <div id="savedLocationsSection" class="hidden">
-            <div class="form-group">
-                <label for="savedLocations">Choose a saved location:</label>
-                <select id="savedLocations">
-                    <option value="">Select a location...</option>
-                </select>
-            </div>
-            <button class="btn" onclick="useSavedLocation()">
-                <i class="fas fa-check-circle"></i> Use Selected Location
-            </button>
-            <div style="text-align: center; margin: 1rem 0;">
-                <span>- OR -</span>
-            </div>
-        </div>
         
-        <div id="newLocationSection">
-            <button id="getLocationBtn" class="btn" onclick="getLocation()">
-                <i class="fas fa-location-arrow"></i> Get Current Location
-            </button>
-            
-            <div id="locationForm" class="hidden">
-                <div class="location-preview" id="locationPreview"></div>
-                <div class="form-group">
-                    <label for="locationName">Location Name:</label>
-                    <input type="text" id="locationName" placeholder="e.g., Room 101" required>
-                </div>
-                <button class="btn" onclick="saveLocation()">
-                    <i class="fas fa-save"></i> Save & Use Location
-                </button>
-            </div>
-        </div>
+        <button id="getLocationBtn" class="btn" onclick="getLocation()">
+            <i class="fas fa-location-arrow"></i> Get Current Location
+        </button>
+        
+        <div id="locationPreview" class="location-preview hidden"></div>
+        
+        <button id="useLocationBtn" class="btn hidden" onclick="useLocation()">
+            <i class="fas fa-check-circle"></i> Use This Location
+        </button>
     </div>
 
     <script>
         let currentLocation = null;
-        let savedLocations = {};
-
-        function init() {
-            // Load saved locations from localStorage
-            const savedLocationsStr = localStorage.getItem('savedLocations');
-            if (savedLocationsStr) {
-                savedLocations = JSON.parse(savedLocationsStr);
-                populateSavedLocations();
-            }
-
-            // Show saved locations section if there are any
-            if (Object.keys(savedLocations).length > 0) {
-                document.getElementById('savedLocationsSection').classList.remove('hidden');
-            }
-        }
-
-        function populateSavedLocations() {
-            const select = document.getElementById('savedLocations');
-            select.innerHTML = '<option value="">Select a location...</option>';
-            
-            Object.entries(savedLocations).forEach(([name, location]) => {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = `${name} (${location.lat.toFixed(6)}, ${location.lng.toFixed(6)})`;
-                select.appendChild(option);
-            });
-        }
 
         function showMessage(text, type) {
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = text;
             messageDiv.className = `alert alert-${type}`;
             messageDiv.classList.remove('hidden');
-        }
-
-        function useSavedLocation() {
-            const select = document.getElementById('savedLocations');
-            const locationName = select.value;
-            
-            if (!locationName) {
-                showMessage('Please select a location', 'danger');
-                return;
-            }
-
-            const location = savedLocations[locationName];
-            sendLocationToParent(location, locationName);
         }
 
         function getLocation() {
@@ -262,8 +168,7 @@
 
             document.getElementById('spinner').style.display = 'block';
             document.getElementById('getLocationBtn').disabled = true;
-            showMessage('Getting your location...', 'info');
-
+            
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     currentLocation = {
@@ -271,68 +176,60 @@
                         lng: position.coords.longitude,
                         accuracy: position.coords.accuracy
                     };
-
-                    // Show location preview and name input
-                    document.getElementById('locationPreview').textContent = 
-                        `Location: ${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)} (±${currentLocation.accuracy.toFixed(0)}m)`;
-                    document.getElementById('locationForm').classList.remove('hidden');
+                    
+                    document.getElementById('locationPreview').innerHTML = 
+                        `Location coordinates: (${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)})
+                         <br>Accuracy: ${currentLocation.accuracy.toFixed(1)} meters`;
+                    document.getElementById('locationPreview').classList.remove('hidden');
+                    document.getElementById('useLocationBtn').classList.remove('hidden');
                     document.getElementById('spinner').style.display = 'none';
-                    document.getElementById('getLocationBtn').style.display = 'none';
-                    showMessage('Location captured! Please enter a name for this location.', 'success');
+                    document.getElementById('getLocationBtn').disabled = false;
+                    
+                    showMessage('Location captured successfully!', 'success');
                 },
                 (error) => {
-                    showMessage('Error getting location: ' + error.message, 'danger');
-                    document.getElementById('getLocationBtn').disabled = false;
                     document.getElementById('spinner').style.display = 'none';
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
+                    document.getElementById('getLocationBtn').disabled = false;
+                    
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            showMessage('Please allow location access to continue', 'danger');
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            showMessage('Location information is unavailable', 'danger');
+                            break;
+                        case error.TIMEOUT:
+                            showMessage('Location request timed out', 'danger');
+                            break;
+                        default:
+                            showMessage('An unknown error occurred', 'danger');
+                            break;
+                    }
                 }
             );
         }
 
-        function saveLocation() {
-            const locationName = document.getElementById('locationName').value.trim();
-            
-            if (!locationName) {
-                showMessage('Please enter a location name', 'danger');
-                return;
-            }
-
+        function useLocation() {
             if (!currentLocation) {
-                showMessage('No location captured', 'danger');
+                showMessage('Please get location first', 'danger');
                 return;
             }
 
-            // Save to localStorage
-            savedLocations[locationName] = currentLocation;
-            localStorage.setItem('savedLocations', JSON.stringify(savedLocations));
-
-            // Send to parent window
-            sendLocationToParent(currentLocation, locationName);
-        }
-
-        function sendLocationToParent(location, name) {
-            if (window.opener) {
+            // Send location back to parent window
+            if (window.opener && !window.opener.closed) {
                 window.opener.postMessage({
-                    ...location,
-                    name: name
-                }, window.location.origin);
-                
-                showMessage('Location sent successfully! This window will close in 3 seconds.', 'success');
-                setTimeout(() => window.close(), 3000);
+                    type: 'location',
+                    data: currentLocation
+                }, '*');
+                window.close();
             } else {
-                showMessage('Error: Could not communicate with main window. Please copy this location manually.', 'danger');
-                document.getElementById('locationPreview').textContent = 
-                    `Location Name: ${name}\nCoordinates: ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`;
-                document.getElementById('locationPreview').classList.remove('hidden');
+                showMessage('Could not communicate with the main window. Please copy these coordinates:', 'danger');
+                const coords = `${currentLocation.lat},${currentLocation.lng}`;
+                navigator.clipboard.writeText(coords).then(() => {
+                    showMessage('Coordinates copied to clipboard!', 'success');
+                });
             }
         }
-
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html> 
