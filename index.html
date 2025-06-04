@@ -1470,6 +1470,7 @@
                 const weekCountSpan = document.getElementById('weekCount');
                 const sessionForm = document.getElementById('sessionForm');
                 const createSessionBtn = document.getElementById('createSessionBtn');
+                const app = this;
                 
                 // Process roster file when selected
                 rosterInput.addEventListener('change', (e) => {
@@ -1481,13 +1482,13 @@
                         document.getElementById('subjectNameInput').value = subjectFromFile;
                         
                         // Process the file
-                        attendanceApp.processRosterFile(file);
+                        app.processRosterFile(file);
                     } else {
                         fileNameSpan.textContent = 'No file chosen';
                     }
                 });
                 
-                sessionForm.addEventListener('submit', async function(e) {
+                sessionForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const week = document.getElementById('week').value;
                     const password = document.getElementById('password').value || null;
@@ -1496,97 +1497,97 @@
                     const useLocation = document.getElementById('useLocation').checked;
                     const locationDistance = document.getElementById('locationDistance').value || 50;
                     
-                    if (!attendanceApp.rosterData || attendanceApp.rosterData.length === 0) {
-                        attendanceApp.showMessage('Please upload a valid roster file first', 'danger');
+                    if (!app.rosterData || app.rosterData.length === 0) {
+                        app.showMessage('Please upload a valid roster file first', 'danger');
                         return;
                     }
                     
-                    if (!attendanceApp.subjectName || !week || !maxAttendees || !taEmail) {
-                        attendanceApp.showMessage('Please fill in all required fields', 'danger');
+                    if (!app.subjectName || !week || !maxAttendees || !taEmail) {
+                        app.showMessage('Please fill in all required fields', 'danger');
                         return;
                     }
                     
-                    if (useLocation && !attendanceApp.classLocation) {
-                        attendanceApp.showMessage('Please set a location first', 'danger');
+                    if (useLocation && !app.classLocation) {
+                        app.showMessage('Please set a location first', 'danger');
                         return;
                     }
                     
                     document.getElementById('sessionsContainer').innerHTML = '';
                     
-                        try {
-                            const sessionId = 'session_' + Date.now();
-                            
-                            // Save TA's IP for blocking
-                            const taIP = await fetch('https://api.ipify.org?format=json')
-                                .then(res => res.json())
-                                .then(data => data.ip)
-                                .catch(() => 'unknown');
+                    try {
+                        const sessionId = 'session_' + Date.now();
+                        
+                        // Save TA's IP for blocking
+                        const taIP = await fetch('https://api.ipify.org?format=json')
+                            .then(res => res.json())
+                            .then(data => data.ip)
+                            .catch(() => 'unknown');
 
-                            const newSession = {
-                                id: sessionId,
-                                subject: attendanceApp.subjectName,
-                                week,
-                                password,
-                                maxAttendees,
-                                roster: attendanceApp.rosterData,
-                                taEmail,
-                                createdAt: window.dbServerTimestamp(),
-                                active: true,
-                                attendeeCount: 0,
-                                useLocation,
-                                locationDistance,
-                                deviceId: attendanceApp.deviceId,
-                                existingWeeks: [...(attendanceApp.existingWeeks || [])],
-                                maxExistingWeek: attendanceApp.maxExistingWeek,
-                                taIP
-                            };
+                        const newSession = {
+                            id: sessionId,
+                            subject: app.subjectName,
+                            week,
+                            password,
+                            maxAttendees,
+                            roster: app.rosterData,
+                            taEmail,
+                            createdAt: window.dbServerTimestamp(),
+                            active: true,
+                            attendeeCount: 0,
+                            useLocation,
+                            locationDistance,
+                            deviceId: app.deviceId,
+                            existingWeeks: [...(app.existingWeeks || [])],
+                            maxExistingWeek: app.maxExistingWeek,
+                            taIP
+                        };
+                        
+                        if (useLocation && app.classLocation) {
+                            newSession.classLocation = app.classLocation;
+                        }
+                        
+                        const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
+                        await window.dbSet(sessionRef, newSession);
+                        
+                        app.saveSessionToLocal(newSession);
                             
-                            if (useLocation && attendanceApp.classLocation) {
-                                newSession.classLocation = attendanceApp.classLocation;
+                        const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
+                            
+                        const sessionData = {
+                            ...newSession,
+                            sessionRef,
+                            attendeesRef,
+                            syncStatus: 'connecting'
+                        };
+                            
+                        app.currentSessions.push(sessionData);
+                        app.displaySession(sessionData);
+                            
+                        // Monitor attendees
+                        window.dbOnValue(attendeesRef, (snapshot) => {
+                            const attendees = snapshot.val() || {};
+                            const attendeeList = Object.values(attendees);
+                            sessionData.attendees = attendeeList;
+                            sessionData.attendeeCount = attendeeList.length;
+                            
+                            app.updateSessionDisplay(sessionData);
+                            
+                            if (attendeeList.length >= maxAttendees && sessionData.active) {
+                                app.endSession(sessionData.id);
                             }
                             
-                            const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
-                            await window.dbSet(sessionRef, newSession);
+                            app.saveSessionToLocal(sessionData);
+                        });
                             
-                            attendanceApp.saveSessionToLocal(newSession);
+                        app.showMessage('Attendance session started successfully!', 'success');
+                        app.addToSessionHistory(sessionData);
+                        document.getElementById('sessionHistoryCard').classList.remove('hidden');
                             
-                            const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
-                            
-                            const sessionData = {
-                                ...newSession,
-                                sessionRef,
-                                attendeesRef,
-                                syncStatus: 'connecting'
-                            };
-                            
-                            this.currentSessions.push(sessionData);
-                            this.displaySession(sessionData);
-                            
-                            // Monitor attendees
-                            window.dbOnValue(attendeesRef, (snapshot) => {
-                                const attendees = snapshot.val() || {};
-                                const attendeeList = Object.values(attendees);
-                                sessionData.attendees = attendeeList;
-                                sessionData.attendeeCount = attendeeList.length;
-                                
-                                this.updateSessionDisplay(sessionData);
-                                
-                                if (attendeeList.length >= maxAttendees && sessionData.active) {
-                                    this.endSession(sessionData.id);
-                                }
-                                
-                                this.saveSessionToLocal(sessionData);
-                            });
-                            
-                            this.showMessage('Attendance session started successfully!', 'success');
-                            this.addToSessionHistory(sessionData);
-                            document.getElementById('sessionHistoryCard').classList.remove('hidden');
-                            
-                        } catch (error) {
-                            console.error('Error creating session:', error);
-                            this.showMessage('Failed to create session: ' + error.message, 'danger');
-                        }
-                    });
+                    } catch (error) {
+                        console.error('Error creating session:', error);
+                        app.showMessage('Failed to create session: ' + error.message, 'danger');
+                    }
+                });
             },
 
             displaySession: function(sessionData) {
