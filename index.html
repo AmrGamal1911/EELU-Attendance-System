@@ -885,30 +885,30 @@
         <!-- Upload Roster Section -->
         <div class="card">
             <h2><i class="fas fa-cloud-upload-alt"></i> Upload Student Roster</h2>
-            <div class="file-upload">
-                <input type="file" id="roster" name="roster" accept=".xlsx,.csv" hidden>
-                <label for="roster" class="btn">
-                    <i class="fas fa-file-excel"></i> Select Excel/CSV File
-                </label>
-                <div id="fileName">Drag & drop or click to browse files</div>
-            </div>
-            <div id="rosterInfo" class="hidden">
-                <div class="flex gap-4">
-                    <div class="form-group flex-1">
-                        <label for="subjectNameInput"><i class="fas fa-book"></i> Subject Name</label>
-                        <div style="display: flex; align-items: center;">
-                            <input type="text" id="subjectNameInput" placeholder="Enter subject name">
+                <div class="file-upload">
+                    <input type="file" id="roster" name="roster" accept=".xlsx,.csv" hidden>
+                    <label for="roster" class="btn">
+                        <i class="fas fa-file-excel"></i> Select Excel/CSV File
+                    </label>
+                    <div id="fileName">Drag & drop or click to browse files</div>
+                </div>
+                <div id="rosterInfo" class="hidden">
+                    <div class="flex gap-4">
+                        <div class="form-group flex-1">
+                            <label for="subjectNameInput"><i class="fas fa-book"></i> Subject Name</label>
+                            <div style="display: flex; align-items: center;">
+                                <input type="text" id="subjectNameInput" placeholder="Enter subject name">
                             <button type="button" class="update-subject-btn" onclick="attendanceApp.updateSubjectName()">
-                                <i class="fas fa-sync-alt"></i> Update
-                            </button>
+                                    <i class="fas fa-sync-alt"></i> Update
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <p><strong><i class="fas fa-users"></i> Students:</strong> <span id="studentCount">0</span></p>
+                            <p><strong><i class="fas fa-calendar-week"></i> Detected Weeks:</strong> <span id="weekCount">None</span></p>
                         </div>
                     </div>
-                    <div class="flex-1">
-                        <p><strong><i class="fas fa-users"></i> Students:</strong> <span id="studentCount">0</span></p>
-                        <p><strong><i class="fas fa-calendar-week"></i> Detected Weeks:</strong> <span id="weekCount">None</span></p>
-                    </div>
                 </div>
-            </div>
         </div>
 
         <!-- Create Session Section -->
@@ -998,6 +998,16 @@
             <div id="locationStatus" class="alert alert-info mt-4">
                 <div id="locationPreview">Waiting for location from mobile device...</div>
                 <div class="spinner mt-2"></div>
+            </div>
+
+            <div id="locationNameForm" class="hidden">
+            <div class="form-group">
+                    <label for="locationName">Location Name:</label>
+                    <input type="text" id="locationName" placeholder="e.g., Room 101" required>
+            </div>
+                <button onclick="saveLocation()" class="btn btn-success">
+                    <i class="fas fa-save"></i> Save Location
+                </button>
             </div>
             
             <div class="flex gap-4 mt-4">
@@ -1243,58 +1253,58 @@
                         document.getElementById('subjectNameInput').value = subjectFromFile;
                         
                         // Automatically process the file
-                        const reader = new FileReader();
-                        
+                    const reader = new FileReader();
+                    
                         reader.onload = (e) => {
-                            try {
-                                const data = new Uint8Array(e.target.result);
-                                const workbook = XLSX.read(data, { type: 'array' });
-                                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-                                
-                                const weekColumns = {};
-                                let maxWeek = 0;
-                                
-                                if (jsonData.length > 0) {
-                                    Object.keys(jsonData[0]).forEach(key => {
-                                        const lowerKey = key.toLowerCase();
-                                        if (lowerKey.includes('timestamp')) return;
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                            
+                            const weekColumns = {};
+                            let maxWeek = 0;
+                            
+                            if (jsonData.length > 0) {
+                                Object.keys(jsonData[0]).forEach(key => {
+                                    const lowerKey = key.toLowerCase();
+                                    if (lowerKey.includes('timestamp')) return;
 
-                                        const match = key.match(/week[\s_]?(\d+)/i);
-                                        if (match) {
-                                            const weekNum = parseInt(match[1]);
-                                            if (!isNaN(weekNum)) {
-                                                weekColumns[weekNum] = key;
-                                                if (weekNum > maxWeek) maxWeek = weekNum;
-                                            }
+                                    const match = key.match(/week[\s_]?(\d+)/i);
+                                    if (match) {
+                                        const weekNum = parseInt(match[1]);
+                                        if (!isNaN(weekNum)) {
+                                            weekColumns[weekNum] = key;
+                                            if (weekNum > maxWeek) maxWeek = weekNum;
                                         }
-                                    });
-                                }
-                                
+                                    }
+                                });
+                            }
+                            
                                 attendanceApp.rosterData = jsonData.map(row => {
-                                    const id = String(row['Student ID'] || row['ID'] || row['id'] || row['StudentID'] || row['student_id'] || '').trim();
-                                    const name = (row['Name'] || row['Student Name'] || row['name'] || row['StudentName'] || row['student_name'] || '').trim();
-                                    const section = (row['Section'] || row['Class'] || row['section'] || row['class'] || '').trim();
-                                    
-                                    const weekData = {};
-                                    Object.keys(weekColumns).forEach(weekNum => {
-                                        const rawValue = row[weekColumns[weekNum]];
-                                        const cleaned = String(rawValue || '').trim().toLowerCase();
-                                        const presentValues = ['1', 'yes', '✓', 'present', 'x'];
-                                        weekData[weekNum] = presentValues.includes(cleaned) ? 1 : 0;
-                                        if (rawValue && typeof rawValue === 'string' && (rawValue.includes('/') || rawValue.includes(':'))) {
-                                            row[`Timestamp Week ${weekNum}`] = rawValue;
-                                        }
-                                    });
-                                    
-                                    return { id, name, section, weekData, ...row };
-                                }).filter(student => student.id && student.name);
+                                const id = String(row['Student ID'] || row['ID'] || row['id'] || row['StudentID'] || row['student_id'] || '').trim();
+                                const name = (row['Name'] || row['Student Name'] || row['name'] || row['StudentName'] || row['student_name'] || '').trim();
+                                const section = (row['Section'] || row['Class'] || row['section'] || row['class'] || '').trim();
                                 
+                                const weekData = {};
+                                Object.keys(weekColumns).forEach(weekNum => {
+                                    const rawValue = row[weekColumns[weekNum]];
+                                    const cleaned = String(rawValue || '').trim().toLowerCase();
+                                    const presentValues = ['1', 'yes', '✓', 'present', 'x'];
+                                    weekData[weekNum] = presentValues.includes(cleaned) ? 1 : 0;
+                                    if (rawValue && typeof rawValue === 'string' && (rawValue.includes('/') || rawValue.includes(':'))) {
+                                        row[`Timestamp Week ${weekNum}`] = rawValue;
+                                    }
+                                });
+                                
+                                return { id, name, section, weekData, ...row };
+                            }).filter(student => student.id && student.name);
+                            
                                 if (attendanceApp.rosterData.length === 0) {
                                     attendanceApp.showMessage('No valid student data found. Please check your file format.', 'danger');
-                                    return;
-                                }
-                                
+                                return;
+                            }
+                            
                                 attendanceApp.subjectName = document.getElementById('subjectNameInput').value;
                                 attendanceApp.existingWeeks = Object.keys(weekColumns).map(Number).sort((a, b) => a - b);
                                 attendanceApp.maxExistingWeek = maxWeek;
@@ -1302,21 +1312,21 @@
                                 studentCountSpan.textContent = attendanceApp.rosterData.length;
                                 weekCountSpan.textContent = attendanceApp.existingWeeks.length > 0 ? 
                                     attendanceApp.existingWeeks.join(', ') : 'None (New Session)';
-                                rosterInfoDiv.classList.remove('hidden');
-                                createSessionBtn.disabled = false;
-                                
+                            rosterInfoDiv.classList.remove('hidden');
+                            createSessionBtn.disabled = false;
+                            
                                 attendanceApp.showMessage('Roster uploaded successfully!', 'success');
-                            } catch (error) {
-                                console.error(error);
+                        } catch (error) {
+                            console.error(error);
                                 attendanceApp.showMessage('Error processing file. Please check the format.', 'danger');
-                            }
-                        };
-                        
+                        }
+                    };
+                    
                         reader.onerror = () => {
                             attendanceApp.showMessage('Error reading file', 'danger');
-                        };
-                        
-                        reader.readAsArrayBuffer(file);
+                    };
+                    
+                    reader.readAsArrayBuffer(file);
                     } else {
                         fileNameSpan.textContent = 'No file chosen';
                     }
@@ -1442,7 +1452,7 @@
                         }
                     };
 
-                    finalizeSession();
+                            finalizeSession();
                 });
             },
 
@@ -2360,6 +2370,11 @@
                 qr.make();
                 qrContainer.innerHTML = qr.createImgTag(10);
                 
+                // Reset form state
+                document.getElementById('locationNameForm').classList.add('hidden');
+                document.getElementById('locationPreview').textContent = 'Waiting for location from mobile device...';
+                document.querySelector('#locationStatus .spinner').style.display = 'block';
+                
                 // Show modal
                 modal.classList.remove('hidden');
                 
@@ -2371,25 +2386,23 @@
                 // Verify origin for security
                 if (event.origin !== window.location.origin) return;
                 
-                if (event.data.type === 'location') {
-                    const locationData = event.data.data;
-                    if (locationData.lat && locationData.lng) {
-                        // Store the location
-                        this.classLocation = locationData;
-                        
-                        // Update location preview
-                        document.getElementById('locationPreview').textContent = 
-                            `Location set: (${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)})`;
-                        
-                        // Hide spinner
-                        document.querySelector('#locationStatus .spinner').style.display = 'none';
-                        
-                        // Close modal
-                        this.closeLocationModal();
-                        
-                        // Show success message
-                        this.showMessage('Location set successfully!', 'success');
-                    }
+                const location = event.data;
+                if (location && location.lat && location.lng) {
+                    // Store the location
+                    this.classLocation = location;
+                    
+                    // Update location preview
+                    document.getElementById('locationPreview').textContent = 
+                        `Location coordinates: (${location.lat.toFixed(6)}, ${location.lng.toFixed(6)})`;
+                    
+                    // Hide spinner
+                    document.querySelector('#locationStatus .spinner').style.display = 'none';
+                    
+                    // Show location name form
+                    document.getElementById('locationNameForm').classList.remove('hidden');
+                    
+                    // Show success message
+                    this.showMessage('Location set successfully!', 'success');
                 }
             },
 
