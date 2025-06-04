@@ -899,11 +899,6 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="password"><i class="fas fa-shield-alt"></i> Session Password (Optional)</label>
-                    <input type="password" id="password" name="password" placeholder="Leave blank for no password">
-                </div>
-                
-                <div class="form-group">
                     <label for="ta_email"><i class="fas fa-envelope"></i> Your Outlook Email</label>
                     <input type="email" id="ta_email" name="ta_email" placeholder="Enter your Outlook email" required>
                 </div>
@@ -920,11 +915,12 @@
                         </button>
                     </label>
                     <div id="locationSettings" class="hidden">
-                        <label for="locationDistance">Maximum Distance (meters):</label>
-                        <input type="number" id="locationDistance" value="50" min="10">
-                        <div id="locationPreview" style="margin-top: 0.5rem; font-size: 0.9rem; color: #6b7280;">
-                            No location selected
-                        </div>
+                        <select id="savedLocations" class="form-control mb-4">
+                            <option value="">Select a saved location</option>
+                        </select>
+                        <button type="button" id="scanLocationQR" class="btn btn-secondary">
+                            <i class="fas fa-qrcode"></i> Scan New Location
+                        </button>
                     </div>
                 </div>
                 
@@ -932,6 +928,37 @@
                     <i class="fas fa-rocket"></i> Launch Session
                 </button>
             </form>
+        </div>
+
+        <!-- Active Session Section -->
+        <div id="activeSession" class="card hidden">
+            <h2><i class="fas fa-check-circle"></i> Session Active</h2>
+            <div class="session-info">
+                <p>
+                    <span><i class="fas fa-book"></i> Subject:</span>
+                    <strong id="activeSubject">-</strong>
+                </p>
+                <p>
+                    <span><i class="fas fa-calendar-week"></i> Week:</span>
+                    <strong id="activeWeek">-</strong>
+                </p>
+                <p>
+                    <span><i class="fas fa-users"></i> Attendees:</span>
+                    <strong><span id="attendeeCount">0</span>/<span id="maxAttendees">-</span></strong>
+                </p>
+            </div>
+
+            <div class="text-center">
+                <div id="qrcode"></div>
+                <div class="session-url">
+                    <div class="input-group">
+                        <input type="text" id="sessionUrl" readonly>
+                        <button class="btn btn-secondary" id="copyUrl">
+                            <i class="fas fa-copy"></i> Copy URL
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Sessions Container -->
@@ -985,7 +1012,7 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
-        import { getDatabase, ref, set, get } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
+        import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyBObz0uvQdLKkCGF7Txb_EPw686FzTmAes",
@@ -1121,53 +1148,133 @@
             }
         });
 
-        // Create session
-        document.getElementById('createSessionBtn').addEventListener('click', async () => {
-            const weekNumber = document.getElementById('week').value;
-            const maxAttendees = document.getElementById('max_attendees').value;
-            const email = document.getElementById('ta_email').value;
-            const enableLocation = document.getElementById('useLocation').checked;
-            const selectedLocation = enableLocation ? savedLocations[document.getElementById('savedLocations').value] : null;
+        // Update the session creation event listener
+        document.getElementById('sessionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
             
-            if (!weekNumber || !maxAttendees || !rosterData) {
-                alert('Please fill in all required fields and upload a roster.');
+            if (!rosterData) {
+                showMessage('Please upload a roster first', 'danger');
                 return;
             }
 
-            // Generate session ID
-            const sessionId = Math.random().toString(36).substring(2, 15);
+            const weekNumber = document.getElementById('week').value;
+            const maxAttendees = document.getElementById('max_attendees').value;
+            const email = document.getElementById('ta_email').value;
+            const useLocation = document.getElementById('useLocation').checked;
+            const selectedLocationName = document.getElementById('savedLocations').value;
+            
+            if (!weekNumber || !maxAttendees || !email) {
+                showMessage('Please fill in all required fields', 'danger');
+                return;
+            }
 
-            // Create session in Firebase
-            const sessionRef = ref(database, `sessions/${sessionId}`);
-            await set(sessionRef, {
-                subject: document.getElementById('subjectNameInput').value,
-                week: weekNumber,
-                maxAttendees: parseInt(maxAttendees),
-                email: email || null,
-                location: selectedLocation,
-                roster: rosterData,
-                createdAt: new Date().toISOString(),
-                attendees: {}
-            });
+            try {
+                // Generate session ID
+                const sessionId = Math.random().toString(36).substring(2, 15);
+                const subjectName = document.getElementById('subjectNameInput').value;
 
-            // Generate QR Code
-            const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
-            const qr = qrcode(0, 'L');
-            qr.addData(formUrl);
-            qr.make();
+                // Get selected location if enabled
+                let location = null;
+                if (useLocation && selectedLocationName) {
+                    location = savedLocations[selectedLocationName];
+                }
 
-            document.getElementById('qrcode').innerHTML = qr.createImgTag(5);
-            document.getElementById('sessionUrl').value = formUrl;
-            document.getElementById('sessionCreated').style.display = 'block';
+                // Create session in Firebase
+                const sessionRef = ref(database, `sessions/${sessionId}`);
+                await set(sessionRef, {
+                    subject: subjectName,
+                    week: parseInt(weekNumber),
+                    maxAttendees: parseInt(maxAttendees),
+                    email: email,
+                    location: location,
+                    roster: rosterData,
+                    createdAt: new Date().toISOString(),
+                    attendees: {}
+                });
+
+                // Update subject record if first session
+                if (isFirstSession) {
+                    await set(ref(database, `subjects/${subjectName}`), {
+                        firstSessionDate: new Date().toISOString(),
+                        email: email
+                    });
+                }
+
+                // Generate QR Code
+                const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
+                const qr = qrcode(0, 'L');
+                qr.addData(formUrl);
+                qr.make();
+
+                // Update UI
+                document.getElementById('qrcode').innerHTML = qr.createImgTag(5);
+                document.getElementById('sessionUrl').value = formUrl;
+                document.getElementById('activeSubject').textContent = subjectName;
+                document.getElementById('activeWeek').textContent = weekNumber;
+                document.getElementById('maxAttendees').textContent = maxAttendees;
+                
+                // Show active session section
+                document.getElementById('activeSession').classList.remove('hidden');
+                
+                // Hide session form
+                document.getElementById('sessionForm').reset();
+                document.getElementById('createSessionBtn').disabled = true;
+
+                showMessage('Session created successfully!', 'success');
+
+                // Start monitoring attendees
+                const attendeesRef = ref(database, `sessions/${sessionId}/attendees`);
+                onValue(attendeesRef, (snapshot) => {
+                    const count = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
+                    document.getElementById('attendeeCount').textContent = count;
+                });
+
+            } catch (error) {
+                console.error('Error creating session:', error);
+                showMessage('Error creating session. Please try again.', 'danger');
+            }
         });
 
-        // Copy session URL
+        // Handle location checkbox
+        document.getElementById('useLocation').addEventListener('change', (e) => {
+            const locationSettings = document.getElementById('locationSettings');
+            const setLocationBtn = document.getElementById('setLocationBtn');
+            
+            locationSettings.classList.toggle('hidden', !e.target.checked);
+            setLocationBtn.style.display = e.target.checked ? 'inline-flex' : 'none';
+
+            if (e.target.checked) {
+                // Populate saved locations
+                const select = document.getElementById('savedLocations');
+                select.innerHTML = '<option value="">Select a saved location</option>';
+                Object.keys(savedLocations).forEach(name => {
+                    select.innerHTML += `<option value="${name}">${name}</option>`;
+                });
+            }
+        });
+
+        // Copy URL functionality
         document.getElementById('copyUrl').addEventListener('click', () => {
             const urlInput = document.getElementById('sessionUrl');
             urlInput.select();
             document.execCommand('copy');
-            alert('URL copied to clipboard!');
+            showMessage('URL copied to clipboard!', 'success');
         });
+
+        // Helper function to show messages
+        function showMessage(text, type) {
+            const message = document.getElementById('message');
+            message.className = `alert alert-${type}`;
+            message.textContent = text;
+            message.style.display = 'block';
+            
+            setTimeout(() => {
+                message.style.display = 'none';
+            }, 3000);
+        }
+
+        // Make functions available globally
+        window.showMessage = showMessage;
     </script>
 </body>
 </html>
