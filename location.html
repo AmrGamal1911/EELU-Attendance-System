@@ -134,25 +134,12 @@
 </head>
 <body>
     <div class="container">
-        <h1><i class="fas fa-map-marker-alt"></i> Set Class Location</h1>
-        
+        <h1><i class="fas fa-map-marker-alt"></i> Getting Location...</h1>
         <div id="message" class="alert hidden"></div>
         <div id="spinner" class="spinner"></div>
-        
-        <button id="getLocationBtn" class="btn" onclick="getLocation()">
-            <i class="fas fa-location-arrow"></i> Get Current Location
-        </button>
-        
-        <div id="locationPreview" class="location-preview hidden"></div>
-        
-        <button id="useLocationBtn" class="btn hidden" onclick="useLocation()">
-            <i class="fas fa-check-circle"></i> Use This Location
-        </button>
     </div>
 
     <script>
-        let currentLocation = null;
-
         function showMessage(text, type) {
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = text;
@@ -160,36 +147,44 @@
             messageDiv.classList.remove('hidden');
         }
 
-        function getLocation() {
+        function sendLocationToParent(location) {
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({
+                    type: 'location',
+                    data: location
+                }, '*');
+                window.close();
+            } else {
+                showMessage('Could not communicate with the main window. Please copy these coordinates:', 'danger');
+                const coords = `${location.lat},${location.lng}`;
+                navigator.clipboard.writeText(coords).then(() => {
+                    showMessage('Coordinates copied to clipboard!', 'success');
+                });
+            }
+        }
+
+        // Start getting location immediately when page loads
+        window.onload = function() {
+            document.getElementById('spinner').style.display = 'block';
+            
             if (!navigator.geolocation) {
                 showMessage('Geolocation is not supported by your browser', 'danger');
                 return;
             }
 
-            document.getElementById('spinner').style.display = 'block';
-            document.getElementById('getLocationBtn').disabled = true;
-            
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    currentLocation = {
+                    const location = {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude,
                         accuracy: position.coords.accuracy
                     };
                     
-                    document.getElementById('locationPreview').innerHTML = 
-                        `Location coordinates: (${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)})
-                         <br>Accuracy: ${currentLocation.accuracy.toFixed(1)} meters`;
-                    document.getElementById('locationPreview').classList.remove('hidden');
-                    document.getElementById('useLocationBtn').classList.remove('hidden');
-                    document.getElementById('spinner').style.display = 'none';
-                    document.getElementById('getLocationBtn').disabled = false;
-                    
-                    showMessage('Location captured successfully!', 'success');
+                    // Send location immediately
+                    sendLocationToParent(location);
                 },
                 (error) => {
                     document.getElementById('spinner').style.display = 'none';
-                    document.getElementById('getLocationBtn').disabled = false;
                     
                     switch(error.code) {
                         case error.PERMISSION_DENIED:
@@ -207,29 +202,7 @@
                     }
                 }
             );
-        }
-
-        function useLocation() {
-            if (!currentLocation) {
-                showMessage('Please get location first', 'danger');
-                return;
-            }
-
-            // Send location back to parent window
-            if (window.opener && !window.opener.closed) {
-                window.opener.postMessage({
-                    type: 'location',
-                    data: currentLocation
-                }, '*');
-                window.close();
-            } else {
-                showMessage('Could not communicate with the main window. Please copy these coordinates:', 'danger');
-                const coords = `${currentLocation.lat},${currentLocation.lng}`;
-                navigator.clipboard.writeText(coords).then(() => {
-                    showMessage('Coordinates copied to clipboard!', 'success');
-                });
-            }
-        }
+        };
     </script>
 </body>
 </html> 
