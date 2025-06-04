@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Form | EELU</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getDatabase, ref, onValue, push, off, set, get } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
+
+            const firebaseConfig = {
+                apiKey: "AIzaSyBObz0uvQdLKkCGF7Txb_EPw686FzTmAes",
+                authDomain: "eelu-attendance.firebaseapp.com",
+                databaseURL: "https://eelu-attendance-default-rtdb.firebaseio.com",
+                projectId: "eelu-attendance",
+                storageBucket: "eelu-attendance.appspot.com",
+                messagingSenderId: "5132239076",
+                appId: "1:5132239076:web:8a3ea3f78d1ca106596cf1",
+                measurementId: "G-D2WNX8RGRL"
+            };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // Get session ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session');
+
+        if (!sessionId) {
+            showError('Invalid session link');
+        } else {
+            // Fetch session data
+            const sessionRef = ref(database, `sessions/${sessionId}`);
+            get(sessionRef).then((snapshot) => {
+                if (snapshot.exists()) {
+                    const session = snapshot.val();
+                    document.getElementById('subjectName').textContent = session.subject;
+                    document.getElementById('weekNumber').textContent = session.week;
+                    
+                    // Check if location verification is required
+                    if (session.location) {
+                        document.getElementById('locationVerification').style.display = 'block';
+                        getStudentLocation(session.location);
+                    }
+                } else {
+                    showError('Session not found');
+                }
+            }).catch((error) => {
+                showError('Error loading session data');
+                console.error(error);
+            });
+        }
+
+        // Calculate distance between two points using Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Earth's radius in meters
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                    Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c; // Distance in meters
+        }
+
+        // Get student's location
+        function getStudentLocation(taLocation) {
+            if (!navigator.geolocation) {
+                showError('Geolocation is not supported by your browser');
+                return;
+            }
+
+            document.getElementById('locationSpinner').style.display = 'block';
+            document.getElementById('locationStatus').textContent = 'Getting your location...';
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const distance = calculateDistance(
+                        latitude,
+                        longitude,
+                        taLocation.lat,
+                        taLocation.lng
+                    );
+
+                    // Allow 50m radius + accuracy buffer
+                    const maxDistance = 50 + (position.coords.accuracy || 0);
+                    
+                    if (distance <= maxDistance) {
+                        document.getElementById('locationStatus').innerHTML = 
+                            '<i class="fas fa-check-circle"></i> Location verified';
+                        document.getElementById('locationStatus').className = 'text-success';
+                        document.getElementById('submitBtn').disabled = false;
+                    } else {
+                        showError(`You are too far from the class location (${Math.round(distance)}m away)`);
+                    }
+                    document.getElementById('locationSpinner').style.display = 'none';
+                },
+                (error) => {
+                    let message = 'Error getting location: ';
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            message += 'Permission denied';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message += 'Position unavailable';
+                            break;
+                        case error.TIMEOUT:
+                            message += 'Request timed out';
+                            break;
+                        default:
+                            message += 'Unknown error';
+                    }
+                    showError(message);
+                    document.getElementById('locationSpinner').style.display = 'none';
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        // Handle form submission
+        document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const studentId = document.getElementById('studentId').value;
+            const sessionRef = ref(database, `sessions/${sessionId}`);
+            
+            try {
+                const snapshot = await get(sessionRef);
+                const session = snapshot.val();
+                
+                // Validate student ID against roster
+                const student = session.roster.find(s => s.id === studentId);
+                if (!student) {
+                    showError('Invalid student ID');
+                    return;
+                }
+                
+                // Check if student already attended
+                if (session.attendees && session.attendees[studentId]) {
+                    showError('You have already submitted attendance for this session');
+                    return;
+                }
+                
+                // Check max attendees limit
+                const attendeeCount = session.attendees ? Object.keys(session.attendees).length : 0;
+                if (attendeeCount >= session.maxAttendees) {
+                    showError('Session is full');
+                    return;
+                }
+                
+                // Record attendance
+                await set(ref(database, `sessions/${sessionId}/attendees/${studentId}`), {
+                    name: student.name,
+                    section: student.section,
+                    timestamp: new Date().toISOString(),
+                    ip: await fetch('https://api.ipify.org?format=json')
+                        .then(response => response.json())
+                        .then(data => data.ip)
+                });
+                
+                // Show success message
+                document.getElementById('successMessage').style.display = 'block';
+                document.getElementById('attendanceForm').style.display = 'none';
+                
+            } catch (error) {
+                showError('Error submitting attendance');
+                console.error(error);
+            }
+        });
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('submitBtn').disabled = true;
+        }
+
+        // Make functions available globally
+        window.showError = showError;
+        window.getStudentLocation = getStudentLocation;
+    </script>
+    
+    <style>
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5a6fd8;
+            --secondary: #764ba2;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --dark: #1f2937;
+            --light: #f8fafc;
+            --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --border-radius: 12px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--light);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            background-image: radial-gradient(circle at 10% 20%, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 90%);
+        }
+        
+        .container {
+            max-width: 500px;
+            width: 100%;
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient);
+        }
+        
+        h1 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+        
+        .session-info {
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(102, 126, 234, 0.1);
+        }
+        
+        .session-info p {
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .session-info strong {
+            color: var(--primary);
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        label i {
+            color: var(--primary);
+            width: 16px;
+        }
+        
+        input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            outline: none;
+        }
+        
+        .btn {
+            background: var(--gradient);
+            color: white;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            width: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+        
+        .btn:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .text-success {
+            color: var(--success);
+        }
+        
+        .text-danger {
+            color: var(--danger);
+        }
+        
+        .spinner {
+            border: 3px solid rgba(102, 126, 234, 0.2);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 0.5rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        #error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+            display: none;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        #successMessage {
+            text-align: center;
+            display: none;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        #successMessage i {
+            font-size: 4rem;
+            color: var(--success);
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1><i class="fas fa-user-check"></i> Student Attendance</h1>
+            
+            <div class="session-info">
+                <p>
+                    <span><i class="fas fa-book"></i> Subject:</span>
+                    <strong id="subjectName">Loading...</strong>
+                </p>
+                <p>
+                    <span><i class="fas fa-calendar-week"></i> Week:</span>
+                    <strong id="weekNumber">Loading...</strong>
+                </p>
+            </div>
+            
+            <div id="error" style="display: none;"></div>
+            
+            <form id="attendanceForm">
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-id-card"></i> Student ID
+                    </label>
+                    <input type="text" id="studentId" required pattern="[0-9]+" 
+                           title="Please enter your numeric student ID">
+                </div>
+                
+                <div id="locationVerification" style="display: none;">
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-map-marker-alt"></i> Location Status
+                        </label>
+                        <div>
+                            <span id="locationSpinner" class="spinner"></span>
+                            <span id="locationStatus">Waiting for verification...</span>
+                        </div>
+                    </div>
+                    </div>
+                    
+                <button type="submit" id="submitBtn" class="btn" disabled>
+                        <i class="fas fa-check-circle"></i> Submit Attendance
+                    </button>
+                </form>
+            
+            <div id="successMessage">
+                <i class="fas fa-check-circle"></i>
+                <h2>Attendance Recorded!</h2>
+                <p>Your attendance has been successfully recorded.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

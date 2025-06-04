@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set Class Location | EELU</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #667eea;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border-radius: 12px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            background: #f8fafc;
+        }
+        
+        .container {
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        h1 {
+            margin-bottom: 2rem;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin: 0 auto;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+        }
+        
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: #047857;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #b91c1c;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #1d4ed8;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        
+        .hidden {
+            display: none;
+        }
+
+        .spinner {
+            border: 3px solid rgba(102, 126, 234, 0.2);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fas fa-map-marker-alt"></i> Set Class Location</h1>
+        
+        <div id="message" class="alert hidden"></div>
+        
+        <div id="spinner" class="spinner"></div>
+        
+        <button id="getLocationBtn" class="btn" onclick="getLocation()">
+            <i class="fas fa-location-arrow"></i> Get Current Location
+        </button>
+    </div>
+
+    <script>
+        function showMessage(type, text) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = `alert alert-${type}`;
+            messageDiv.textContent = text;
+            messageDiv.classList.remove('hidden');
+        }
+
+        function showSpinner(show) {
+            document.getElementById('spinner').style.display = show ? 'block' : 'none';
+            document.getElementById('getLocationBtn').style.display = show ? 'none' : 'flex';
+        }
+
+        function getLocation() {
+            if (!navigator.geolocation) {
+                showMessage('danger', 'Geolocation is not supported by your browser');
+                return;
+            }
+
+            showSpinner(true);
+            showMessage('info', 'Getting your location...');
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude: lat, longitude: lng } = position.coords;
+                    
+                    // Send coordinates back to parent window
+                    if (window.opener) {
+                        window.opener.postMessage({ lat, lng }, '*');
+                        showMessage('success', 'Location set successfully! You can close this window.');
+                        showSpinner(false);
+                        document.getElementById('getLocationBtn').style.display = 'none';
+                    } else {
+                        showMessage('danger', 'Error: Could not communicate with main window');
+                        showSpinner(false);
+                    }
+                },
+                (error) => {
+                    let message = 'Error getting location: ';
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            message += 'Permission denied';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message += 'Position unavailable';
+                            break;
+                        case error.TIMEOUT:
+                            message += 'Request timed out';
+                            break;
+                        default:
+                            message += 'Unknown error';
+                    }
+                    showMessage('danger', message);
+                    showSpinner(false);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+    </script>
+</body>
+</html> 
