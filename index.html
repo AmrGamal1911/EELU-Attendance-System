@@ -2540,8 +2540,11 @@
                 // Update location dropdown
                 this.updateLocationDropdown(locationName);
                 
-                // Close modal properly
+                // Close modal and reset form
                 document.getElementById('locationQRModal').classList.add('hidden');
+                document.getElementById('locationName').value = '';
+                document.getElementById('locationStatus').style.display = 'block';
+                document.getElementById('locationNameForm').classList.add('hidden');
                 
                 // Show success message
                 this.showMessage('Location saved successfully!', 'success');
@@ -2566,12 +2569,30 @@
                     option.textContent = name;
                     if (name === selectedLocationName) {
                         option.selected = true;
+                        // Update the class location when a saved location is selected
+                        this.classLocation = savedLocations[name];
                     }
                     locationSelect.appendChild(option);
                 });
             },
 
-            // Add this new function to load saved locations on init
+            // Add this new function to handle location select changes
+            handleLocationSelectChange: function(e) {
+                const selectedName = e.target.value;
+                const deviceId = localStorage.getItem('deviceId') || Date.now().toString();
+                const savedLocations = JSON.parse(localStorage.getItem(`savedLocations_${deviceId}`) || '{}');
+                
+                if (selectedName && savedLocations[selectedName]) {
+                    this.classLocation = savedLocations[selectedName];
+                    document.getElementById('locationPreview').style.display = 'block';
+                    document.getElementById('locationPreview').textContent = 
+                        `Location: ${selectedName} (${this.classLocation.lat.toFixed(6)}, ${this.classLocation.lng.toFixed(6)})`;
+                } else {
+                    this.classLocation = null;
+                    document.getElementById('locationPreview').style.display = 'none';
+                }
+            },
+
             loadSavedLocations: function() {
                 const deviceId = localStorage.getItem('deviceId') || Date.now().toString();
                 const savedLocations = JSON.parse(localStorage.getItem(`savedLocations_${deviceId}`) || '{}');
@@ -2582,18 +2603,7 @@
                 // Add event listener for location select change
                 const locationSelect = document.getElementById('locationSelect');
                 if (locationSelect) {
-                    locationSelect.addEventListener('change', (e) => {
-                        const selectedName = e.target.value;
-                        if (selectedName) {
-                            const location = savedLocations[selectedName];
-                            if (location) {
-                                this.classLocation = location;
-                                document.getElementById('locationPreview').style.display = 'block';
-                                document.getElementById('locationPreview').textContent = 
-                                    `Location: ${selectedName} (${location.lat.toFixed(6)}, ${location.lng.toFixed(6)})`;
-                            }
-                        }
-                    });
+                    locationSelect.addEventListener('change', (e) => this.handleLocationSelectChange(e));
                 }
             }
         };
