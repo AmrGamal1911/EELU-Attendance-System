@@ -1236,13 +1236,54 @@
                 rosterInput.addEventListener('change', (e) => this.handleFileSelection(e));
                 
                 this.initVoiceCommands();
-                this.loadSessionHistory();
+                this.renderSessionHistory(); // Changed from loadSessionHistory to renderSessionHistory
                 this.initializeApp();
 
                 // Clean up when page is closed
                 window.addEventListener('beforeunload', () => {
                     this.cleanup();
                 });
+            },
+
+            // Add renderSessionHistory function
+            renderSessionHistory: function() {
+                const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
+                const historyList = document.getElementById('sessionHistoryList');
+                const historyCard = document.getElementById('sessionHistoryCard');
+                
+                if (!history.length) {
+                    historyCard.classList.add('hidden');
+                    return;
+                }
+                
+                historyCard.classList.remove('hidden');
+                
+                const historyHtml = history.map(session => `
+                    <div class="session-item ${session.active ? 'active' : ''}">
+                        <div class="session-header">
+                            <h3>${session.subject} - Week ${session.week}</h3>
+                            <span class="timestamp">${new Date(session.date).toLocaleString()}</span>
+                        </div>
+                        <div class="session-info">
+                            <span class="attendance-count">
+                                <i class="fas fa-users"></i> ${session.attendees}/${session.maxAttendees} students
+                            </span>
+                            <div class="session-actions">
+                                <button onclick="attendanceApp.exportAttendanceReport('${session.id}')" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-download"></i> Export
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                historyList.innerHTML = historyHtml;
+            },
+
+            clearSessionHistory: function() {
+                localStorage.removeItem('sessionHistory');
+                this.renderSessionHistory();
+                this.showMessage('Session history cleared', 'success');
             },
 
             handleFileSelection: function(e) {
