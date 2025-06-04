@@ -871,6 +871,31 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        .form-control {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            outline: none;
+        }
+
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236b7280'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 1.5em;
+            padding-right: 2.5rem;
+        }
     </style>
 </head>
 <body>
@@ -950,9 +975,17 @@
                         </button>
                     </label>
                     <div id="locationSettings" class="hidden">
-                        <label for="locationDistance">Maximum Distance (meters):</label>
-                        <input type="number" id="locationDistance" value="50" min="10">
-                        <div id="locationPreview" style="margin-top: 0.5rem; font-size: 0.9rem; color: #6b7280;">
+                        <div class="form-group">
+                            <label for="locationSelect"><i class="fas fa-map-marker-alt"></i> Saved Locations</label>
+                            <select id="locationSelect" class="form-control">
+                                <option value="">Select a saved location</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="locationDistance"><i class="fas fa-ruler"></i> Maximum Distance (meters):</label>
+                            <input type="number" id="locationDistance" class="form-control" value="50" min="10">
+                        </div>
+                        <div id="locationPreview" class="alert alert-info" style="display: none;">
                             No location selected
                         </div>
                     </div>
@@ -1472,13 +1505,15 @@
                 const sessionCard = document.createElement('div');
                 sessionCard.className = 'card session-card';
                 sessionCard.id = `sessionCard_${sessionId}`;
+                
+                // Create session card HTML
                 sessionCard.innerHTML = `
                     <div class="session-status session-active" id="sessionStatus_${sessionId}">
                         <i class="fas fa-broadcast-tower"></i> 
-                        <span>Session Active & Live</span>
+                        <span>Session Active</span>
                         <div class="sync-status">
-                            <div class="sync-indicator" id="syncIndicator_${sessionId}"></div>
-                            <span id="syncStatus_${sessionId}">Connecting...</span>
+                            <div class="sync-indicator connected" id="syncIndicator_${sessionId}"></div>
+                            <span id="syncStatus_${sessionId}">Connected</span>
                         </div>
                     </div>
                     
@@ -1546,12 +1581,33 @@
                 
                 sessionsContainer.appendChild(sessionCard);
                 
+                // Generate and set QR code
                 const formUrl = `${window.location.origin}/form.html?session=${sessionId}`;
                 const qr = qrcode(0, 'L');
                 qr.addData(formUrl);
                 qr.make();
                 document.getElementById(`qrcode_${sessionId}`).innerHTML = qr.createImgTag(5);
                 document.getElementById(`sessionUrl_${sessionId}`).value = formUrl;
+                
+                // Set up Firebase listeners
+                const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
+                window.dbOnValue(attendeesRef, (snapshot) => {
+                    // Update connected status immediately when we get data
+                    const syncIndicator = document.getElementById(`syncIndicator_${sessionId}`);
+                    const syncStatus = document.getElementById(`syncStatus_${sessionId}`);
+                    if (syncIndicator && syncStatus) {
+                        syncIndicator.className = 'sync-indicator connected';
+                        syncStatus.textContent = 'Connected';
+                    }
+                    
+                    // Rest of the attendance handling code
+                    const attendees = snapshot.val() || {};
+                    const attendeeList = Object.values(attendees);
+                    sessionData.attendees = attendeeList;
+                    sessionData.attendeeCount = attendeeList.length;
+                    this.updateSessionDisplay(sessionData);
+                    this.saveSessionToLocal(sessionData);
+                });
             },
 
             showStudentQRCodes: function(sessionId) {
@@ -2392,11 +2448,12 @@
                         };
                         
                         // Update location preview
+                        document.getElementById('locationPreview').style.display = 'block';
                         document.getElementById('locationPreview').textContent = 
                             `Location coordinates: (${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)})`;
                         
-                        // Hide spinner
-                        document.querySelector('#locationStatus .spinner').style.display = 'none';
+                        // Hide waiting message
+                        document.getElementById('locationStatus').style.display = 'none';
                         
                         // Show location name form
                         document.getElementById('locationNameForm').classList.remove('hidden');
@@ -2458,7 +2515,7 @@
                 
                 if (!locationName) {
                     this.showMessage('Please enter a location name', 'danger');
-                    return;
+                            return;
                 }
                 
                 if (!this.classLocation) {
