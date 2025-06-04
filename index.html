@@ -990,7 +990,7 @@
     <!-- Location Picker Modal -->
     <div id="locationQRModal" class="modal hidden">
         <div class="modal-content">
-            <h2><i class="fas fa-qrcode"></i> Set Location via Mobile</h2>
+            <h2><i class="fas fa-qrcode"></i> Set Class Location</h2>
             <p class="text-center mb-4">Scan this QR code with your mobile device to set the class location</p>
             
             <div id="locationQRCode" class="text-center"></div>
@@ -998,6 +998,16 @@
             <div id="locationStatus" class="alert alert-info mt-4">
                 <div id="locationPreview">Waiting for location from mobile device...</div>
                 <div class="spinner mt-2"></div>
+            </div>
+
+            <div id="locationNameForm" class="hidden">
+                <div class="form-group">
+                    <label for="locationName">Location Name:</label>
+                    <input type="text" id="locationName" placeholder="e.g., Room 101" required>
+                </div>
+                <button onclick="saveLocation()" class="btn btn-success">
+                    <i class="fas fa-save"></i> Save Location
+                </button>
             </div>
             
             <div class="flex gap-4 mt-4">
@@ -2371,22 +2381,20 @@
                 // Verify origin for security
                 if (event.origin !== window.location.origin) return;
                 
-                const { lat, lng, accuracy, name } = event.data;
-                if (lat && lng) {
-                    attendanceApp.classLocation = { lat, lng, accuracy };
-                    
-                    // Update location preview
-                    document.getElementById('locationPreview').textContent = 
-                        `Location: ${name} (${lat.toFixed(6)}, ${lng.toFixed(6)})`;
-                    
-                    // Close modal
-                    document.getElementById('locationQRModal').classList.add('hidden');
-                    
-                    // Remove message listener
-                    window.removeEventListener('message', attendanceApp.handleLocationMessage);
-                    
-                    // Show success message
-                    attendanceApp.showMessage('Location set successfully!', 'success');
+                if (event.data.type === 'location') {
+                    const locationData = event.data.data;
+                    if (locationData.lat && locationData.lng) {
+                        // Store the location temporarily
+                        this.classLocation = locationData;
+                        
+                        // Update location preview
+                        document.getElementById('locationPreview').textContent = 
+                            `Coordinates: (${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)})`;
+                        
+                        // Hide spinner and show location name form
+                        document.querySelector('#locationStatus .spinner').style.display = 'none';
+                        document.getElementById('locationNameForm').classList.remove('hidden');
+                    }
                 }
             },
 
@@ -2404,6 +2412,35 @@
                         } else {
                     this.showMessage('Please enter a valid subject name', 'danger');
                 }
+            },
+
+            saveLocation: function() {
+                const locationName = document.getElementById('locationName').value.trim();
+                
+                if (!locationName) {
+                    this.showMessage('Please enter a location name', 'danger');
+                    return;
+                }
+                
+                if (!this.classLocation) {
+                    this.showMessage('No location data available', 'danger');
+                    return;
+                }
+                
+                // Save to localStorage
+                const savedLocations = JSON.parse(localStorage.getItem('savedLocations') || '{}');
+                savedLocations[locationName] = this.classLocation;
+                localStorage.setItem('savedLocations', JSON.stringify(savedLocations));
+                
+                // Update location preview in the main form
+                document.getElementById('locationPreview').textContent = 
+                    `Location: ${locationName} (${this.classLocation.lat.toFixed(6)}, ${this.classLocation.lng.toFixed(6)})`;
+                
+                // Close modal
+                this.closeLocationModal();
+                
+                // Show success message
+                this.showMessage('Location saved successfully!', 'success');
             }
         };
 
