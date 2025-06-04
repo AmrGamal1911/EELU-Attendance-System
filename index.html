@@ -1235,8 +1235,27 @@
                 const rosterInput = document.getElementById('roster');
                 rosterInput.addEventListener('change', (e) => this.handleFileSelection(e));
                 
+                // Set up message listener for real-time updates
+                window.addEventListener('message', (event) => {
+                    if (event.origin !== window.location.origin) return;
+                    
+                    if (event.data.type === 'attendanceUpdate') {
+                        const { sessionId, attendees } = event.data;
+                        const session = this.currentSessions.find(s => s.id === sessionId);
+                        
+                        if (session) {
+                            console.log('Received attendance update for session:', sessionId);
+                            session.attendees = attendees;
+                            session.attendeeCount = attendees.length;
+                            this.updateSessionDisplay(session);
+                            this.updateAttendanceList(session);
+                            this.saveSessionToLocal(session);
+                        }
+                    }
+                });
+                
                 this.initVoiceCommands();
-                this.renderSessionHistory(); // Changed from loadSessionHistory to renderSessionHistory
+                this.renderSessionHistory();
                 this.initializeApp();
 
                 // Clean up when page is closed
