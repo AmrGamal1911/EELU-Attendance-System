@@ -112,9 +112,13 @@
             font-size: 3rem;
             font-weight: 700;
             background: var(--gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            background-clip: padding-box;
+            -webkit-background-clip: padding-box;
+            -moz-background-clip: padding-box;
             background-clip: text;
+            -webkit-background-clip: text;
+            -moz-background-clip: text;
+            -webkit-text-fill-color: transparent;
             margin-bottom: 1rem;
             letter-spacing: -0.02em;
             font-family: var(--font-primary);
@@ -1160,10 +1164,13 @@
         .modal-title i {
             font-size: 1.5rem;
             background: var(--gradient);
-            -webkit-background-clip: text;
+            background-clip: padding-box;
+            -webkit-background-clip: padding-box;
+            -moz-background-clip: padding-box;
             background-clip: text;
+            -webkit-background-clip: text;
+            -moz-background-clip: text;
             -webkit-text-fill-color: transparent;
-            color: transparent;
             padding: 0.75rem;
             border-radius: 12px;
             background-color: rgba(79, 70, 229, 0.1);
