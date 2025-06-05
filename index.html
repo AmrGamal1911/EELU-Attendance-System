@@ -3060,9 +3060,9 @@
                     <div class="session-status session-active" id="sessionStatus_${sessionId}">
                         <i class="fas fa-broadcast-tower"></i> 
                         <span>Session Active</span>
-                        <div class="sync-status">
+                                                    <div class="sync-status">
                             <div class="sync-indicator connected" id="syncIndicator_${sessionId}"></div>
-                            <span id="syncStatus_${sessionId}">Connected</span>
+                            <span id="syncStatus_${sessionId}"><i class="fas fa-check-circle"></i> Connected</span>
                         </div>
                     </div>
                     
@@ -3099,9 +3099,9 @@
                     
                     <div class="form-group session-url">
                         <label><strong><i class="fas fa-link"></i> Student Access Link:</strong></label>
-                        <div class="input-group">
-                            <input type="text" id="sessionUrl_${sessionId}" readonly>
-                            <button type="button" class="btn btn-secondary copy-btn" onclick="attendanceApp.copyToClipboard('${sessionId}')">
+                        <div class="input-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="text" id="sessionUrl_${sessionId}" readonly style="flex: 1;">
+                            <button type="button" class="btn btn-secondary copy-btn" onclick="attendanceApp.copyToClipboard('${sessionId}')" style="flex-shrink: 0;">
                                 <i class="fas fa-copy"></i>
                             </button>
                         </div>
