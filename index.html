@@ -1227,7 +1227,7 @@
                 document.getElementById('setLocationBtn').addEventListener('click', () => {
                     this.openLocationModal();
                 });
-
+                
                 // Load saved locations
                 this.loadSavedLocations();
                 
@@ -1864,7 +1864,7 @@
                         let notesHtml = '';
                         const ip = attendee.deviceInfo?.ip;
                         
-                        // Check for same IP and add notes
+                        // Check for same IP
                         if (ip && ipGroups[ip].length > 1) {
                             const otherStudents = ipGroups[ip]
                                 .filter(a => a.id !== attendee.id)
@@ -1873,28 +1873,15 @@
                             notesHtml += `
                                 <div class="alert alert-warning mt-1" style="display: block; margin: 0.5rem 0;">
                                     <i class="fas fa-exclamation-triangle"></i> 
-                                    Same IP address with: ${otherStudents}
+                                    Same IP with: ${otherStudents}
                                 </div>
                             `;
-                            
-                            // Add attendance record note
-                            if (attendee.weekData) {
-                                const weekNum = sessionData.week;
-                                if (attendee.weekData[weekNum]) {
-                                    notesHtml += `
-                                        <div class="alert alert-info mt-1" style="display: block; margin: 0.5rem 0;">
-                                            <i class="fas fa-info-circle"></i> 
-                                            Attendance recorded for Week ${weekNum}
-                                        </div>
-                                    `;
-                                }
-                            }
                         }
 
-                        // Add any additional notes from the attendance record
+                        // Add any additional notes
                         if (attendee.notes && attendee.notes.length > 0) {
                             attendee.notes.forEach(note => {
-                                if (!notesHtml.includes(note)) { // Avoid duplicate notes
+                                if (!notesHtml.includes(note)) {
                                     notesHtml += `
                                         <div class="alert alert-info mt-1" style="display: block; margin: 0.5rem 0;">
                                             <i class="fas fa-info-circle"></i> 
@@ -1905,7 +1892,7 @@
                             });
                         }
 
-                        let locationHtml = '';
+                        // Add location verification status
                         if (attendee.location) {
                             const locationClass = attendee.location.verified ? 'alert-success' : 'alert-danger';
                             const locationIcon = attendee.location.verified ? 'fa-check-circle' : 'fa-exclamation-triangle';
@@ -1923,7 +1910,7 @@
                                 <div class="attendee-info">
                                     <div style="font-weight: 500; color: #1f2937;">
                                         ${attendee.name} (${attendee.id})
-                                    </div>
+                                </div>
                                     <div style="color: #6b7280; font-size: 0.875rem;">
                                         Section: ${attendee.section}
                                         <br>
@@ -2256,23 +2243,23 @@
                                 <span class="attendance-count">
                                     <i class="fas fa-users"></i> ${session.attendees}/${session.maxAttendees} students
                                 </span>
-                                <div class="session-actions">
+                        <div class="session-actions">
                                     ${isActive ? `
                                         <button onclick="attendanceApp.openFullscreenQR('${session.id}')" class="btn btn-secondary btn-sm">
                                             <i class="fas fa-qrcode"></i> QR Code
-                                        </button>
+                            </button>
                                         <button onclick="attendanceApp.copyToClipboard('${session.id}')" class="btn btn-secondary btn-sm">
                                             <i class="fas fa-link"></i> Copy Link
-                                        </button>
+                            </button>
                                         <button onclick="attendanceApp.endSession('${session.id}')" class="btn btn-danger btn-sm">
                                             <i class="fas fa-stop-circle"></i> End
-                                        </button>
-                                    ` : ''}
+                                </button>
+                            ` : ''}
                                     <button onclick="attendanceApp.exportAttendanceReport('${session.id}')" class="btn btn-success btn-sm">
                                         <i class="fas fa-download"></i> Export
                                     </button>
-                                </div>
-                            </div>
+                        </div>
+                    </div>
                         </div>
                     `;
                 }).join('');
