@@ -1857,7 +1857,7 @@
                         ipGroups[ip].push(attendee);
                     }
                 });
-
+                
                 const attendeesHtml = attendees
                     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
                     .map(attendee => {
@@ -2215,56 +2215,6 @@
                 
                 localStorage.setItem('sessionHistory', JSON.stringify(history));
                 this.renderSessionHistory();
-            },
-
-            updateSessionHistory: function() {
-                const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
-                const historyList = document.getElementById('sessionHistoryList');
-                
-                if (!history.length) {
-                    historyList.innerHTML = `
-                        <div class="empty-state">
-                            <i class="fas fa-history"></i>
-                            <p>No previous sessions</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                const historyHtml = history.map(session => {
-                    const isActive = session.active;
-                    return `
-                        <div class="session-item ${isActive ? 'active' : ''}">
-                            <div class="session-header">
-                                <h3>${session.subject} - Week ${session.week}</h3>
-                                <span class="timestamp">${new Date(session.date).toLocaleString()}</span>
-                            </div>
-                            <div class="session-info">
-                                <span class="attendance-count">
-                                    <i class="fas fa-users"></i> ${session.attendees}/${session.maxAttendees} students
-                                </span>
-                        <div class="session-actions">
-                                    ${isActive ? `
-                                        <button onclick="attendanceApp.openFullscreenQR('${session.id}')" class="btn btn-secondary btn-sm">
-                                            <i class="fas fa-qrcode"></i> QR Code
-                            </button>
-                                        <button onclick="attendanceApp.copyToClipboard('${session.id}')" class="btn btn-secondary btn-sm">
-                                            <i class="fas fa-link"></i> Copy Link
-                            </button>
-                                        <button onclick="attendanceApp.endSession('${session.id}')" class="btn btn-danger btn-sm">
-                                            <i class="fas fa-stop-circle"></i> End
-                                </button>
-                            ` : ''}
-                                    <button onclick="attendanceApp.exportAttendanceReport('${session.id}')" class="btn btn-success btn-sm">
-                                        <i class="fas fa-download"></i> Export
-                                    </button>
-                        </div>
-                    </div>
-                        </div>
-                    `;
-                }).join('');
-                
-                historyList.innerHTML = historyHtml;
             },
 
             setupAttendanceListener: function(sessionId) {
@@ -2809,13 +2759,76 @@
                         this.updateAttendanceList(session);
                         this.updateSessionDisplay(session);
                         
+                        // Update session history item
+                        const historyItem = document.querySelector(`#sessionHistory_${session.id}`);
+                        if (historyItem) {
+                            const countSpan = historyItem.querySelector('.attendance-count');
+                            if (countSpan) {
+                                countSpan.innerHTML = `<i class="fas fa-users"></i> ${session.attendeeCount}/${session.maxAttendees} students`;
+                            }
+                            
+                            const timeSpan = historyItem.querySelector('.timestamp');
+                            if (timeSpan) {
+                                timeSpan.textContent = new Date().toLocaleString();
+                            }
+                        }
+                        
                         // Save to local storage
                         this.saveSessionToLocal(session);
-                        
-                        // Update session history
-                        this.renderSessionHistory();
                     });
+                    
+                    session.attendeesRef = attendeesRef;
                 });
+            },
+
+            updateSessionHistory: function() {
+                const historyList = document.getElementById('sessionHistoryList');
+                if (!this.currentSessions || this.currentSessions.length === 0) {
+                    historyList.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-history"></i>
+                            <p>No previous sessions</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const historyHtml = this.currentSessions
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                    .map(session => {
+                        const attendeeCount = session.attendees ? session.attendees.length : 0;
+                        return `
+                            <div class="session-item" id="sessionHistory_${session.id}">
+                                <div class="session-header">
+                                    <h3>${session.subject} - Week ${session.week}</h3>
+                                    <span class="timestamp">${new Date(session.timestamp).toLocaleString()}</span>
+                                </div>
+                                <div class="session-info">
+                                    <span class="attendance-count">
+                                        <i class="fas fa-users"></i> ${attendeeCount}/${session.maxAttendees} students
+                                    </span>
+                                    <div class="session-actions">
+                                        ${session.active ? `
+                                            <button onclick="attendanceApp.openFullscreenQR('${session.id}')" class="btn btn-secondary btn-sm">
+                                                <i class="fas fa-qrcode"></i> QR Code
+                                            </button>
+                                            <button onclick="attendanceApp.copyToClipboard('${session.id}')" class="btn btn-secondary btn-sm">
+                                                <i class="fas fa-link"></i> Copy Link
+                                            </button>
+                                            <button onclick="attendanceApp.endSession('${session.id}')" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-stop-circle"></i> End
+                                            </button>
+                                        ` : ''}
+                                        <button onclick="attendanceApp.exportAttendanceReport('${session.id}')" class="btn btn-success btn-sm">
+                                            <i class="fas fa-download"></i> Export
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                
+                historyList.innerHTML = historyHtml;
             }
         };
 
