@@ -1634,11 +1634,22 @@
                 
                 // Set up Firebase listeners first
                 const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
-                window.dbOnValue(attendeesRef, (snapshot) => {
+                window.dbOnValue(attendeesRef, async (snapshot) => {
                     const attendees = snapshot.val() || {};
                     const attendeeList = Object.values(attendees);
                     sessionData.attendees = attendeeList;
                     sessionData.attendeeCount = attendeeList.length;
+                    
+                    // Check if max attendees reached and end session if needed
+                    if (attendeeList.length >= sessionData.maxAttendees && sessionData.active) {
+                        try {
+                            await this.endSession(sessionId);
+                            return;
+                        } catch (error) {
+                            console.error('Error auto-ending session:', error);
+                            this.showMessage('Failed to auto-end session: ' + error.message, 'danger');
+                        }
+                    }
                     
                     // Update attendance count and progress
                     const attendedCount = document.getElementById(`attendedCount_${sessionId}`);
@@ -2113,15 +2124,21 @@
                     // Get current session data first
                     const session = this.currentSessions.find(s => s.id === sessionId);
                     if (!session) {
-                        this.showMessage('Session not found', 'danger');
-                        return;
+                        const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
+                        const sessionSnapshot = await window.dbGet(sessionRef);
+                        if (!sessionSnapshot.exists()) {
+                            this.showMessage('Session not found', 'danger');
+                            return;
+                        }
+                        session = sessionSnapshot.val();
                     }
 
                     // Get final attendance data
-                    const attendeesSnapshot = await window.dbGet(window.dbRef(window.database, `sessions/${sessionId}/attendees`));
+                    const attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
+                    const attendeesSnapshot = await window.dbGet(attendeesRef);
                     const finalAttendees = attendeesSnapshot.val() || {};
                     
-                    // Clean up listeners first
+                    // Clean up listeners
                     if (session.attendeesRef) window.dbOff(session.attendeesRef);
                     if (session.sessionRef) window.dbOff(session.sessionRef);
                     this.currentSessions = this.currentSessions.filter(s => s.id !== sessionId);
@@ -2146,33 +2163,24 @@
 
                     // Update session in history with complete data
                     const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
+                    const historyEntry = {
+                        id: sessionId,
+                        subject: completeSessionData.subject,
+                        week: completeSessionData.week,
+                        date: new Date().toISOString(),
+                        attendees: completeSessionData.attendeeCount,
+                        maxAttendees: completeSessionData.maxAttendees,
+                        active: false,
+                        roster: completeSessionData.roster,
+                        attendeeData: finalAttendees,
+                        deviceId: this.deviceId
+                    };
+
                     const sessionIndex = history.findIndex(s => s.id === sessionId);
                     if (sessionIndex !== -1) {
-                        history[sessionIndex] = {
-                            id: sessionId,
-                            subject: completeSessionData.subject,
-                            week: completeSessionData.week,
-                            date: new Date().toISOString(),
-                            attendees: completeSessionData.attendeeCount,
-                            maxAttendees: completeSessionData.maxAttendees,
-                            active: false,
-                            roster: completeSessionData.roster,
-                            attendeeData: finalAttendees,
-                            deviceId: this.deviceId
-                        };
+                        history[sessionIndex] = historyEntry;
                     } else {
-                        history.unshift({
-                            id: sessionId,
-                            subject: completeSessionData.subject,
-                            week: completeSessionData.week,
-                            date: new Date().toISOString(),
-                            attendees: completeSessionData.attendeeCount,
-                            maxAttendees: completeSessionData.maxAttendees,
-                            active: false,
-                            roster: completeSessionData.roster,
-                            attendeeData: finalAttendees,
-                            deviceId: this.deviceId
-                        });
+                        history.unshift(historyEntry);
                     }
                     localStorage.setItem('sessionHistory', JSON.stringify(history));
 
@@ -2204,7 +2212,7 @@
 
                 } catch (error) {
                     console.error('Error ending session:', error);
-                    this.showMessage('Failed to end session: ' + error.message, 'danger');
+                    throw error; // Re-throw to handle in calling functions
                 }
             },
 
@@ -2450,7 +2458,10 @@
                 } else if (command.includes('end session') || command.includes('stop session')) {
                     const activeSession = this.currentSessions.find(s => s.active);
                     if (activeSession) {
-                        this.endSession(activeSession.id);
+                        this.endSession(activeSession.id).catch(error => {
+                            console.error('Error ending session via voice command:', error);
+                            this.showMessage('Failed to end session: ' + error.message, 'danger');
+                        });
                     } else {
                         this.showMessage('No active session to end', 'warning');
                     }
