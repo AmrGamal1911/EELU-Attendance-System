@@ -342,7 +342,6 @@
                 <div class="session-info">
                     <p><strong><i class="fas fa-book"></i> Subject:</strong> <span id="displaySubject">-</span></p>
                     <p><strong><i class="fas fa-calendar-week"></i> Week:</strong> <span id="displayWeek">-</span></p>
-                    <p><strong><i class="fas fa-users"></i> Attendance:</strong> <span id="attendedCount">0</span>/<span id="maxAttendees">-</span></p>
                 </div>
                 
                 <div id="message" class="alert hidden"></div>
@@ -357,6 +356,8 @@
                         <label for="password"><i class="fas fa-lock"></i> Session Password</label>
                         <input type="password" id="password" name="password" placeholder="Enter session password">
                     </div>
+                    
+                    <div id="locationStatus" class="alert hidden"></div>
                     
                     <button type="submit" class="btn" id="submitBtn">
                         <i class="fas fa-check-circle"></i> Submit Attendance
@@ -376,6 +377,13 @@
                 <h1>No Session Found</h1>
                 <p>The attendance session could not be found.</p>
                 <p>Please check the link or contact your instructor.</p>
+            </div>
+            
+            <div id="sessionFull" class="hidden closed-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h1>Session Full</h1>
+                <p>This session is full.</p>
+                <p>Please contact your instructor for assistance.</p>
             </div>
         </div>
     </div>
@@ -412,18 +420,35 @@
                     const sessionData = sessionSnapshot.val();
                     
                     if (!sessionData) {
-                            this.showNoSession();
-                            return;
-                        }
-
-                    if (!sessionData.active) {
-                            this.showClosedSession();
-                            return;
-                        }
-
-                    this.sessionData = sessionData;
+                        this.showNoSession();
+                        return;
+                    }
                     
-                    // Set up real-time listener for session status
+                    if (!sessionData.active) {
+                        this.showClosedSession();
+                        return;
+                    }
+
+                    // Get current IP first
+                    try {
+                        const ipResponse = await fetch('https://api.ipify.org?format=json');
+                        const ipData = await ipResponse.json();
+                        this.currentIP = ipData.ip;
+                    } catch (error) {
+                        console.warn('Could not get IP:', error);
+                        this.currentIP = 'unknown';
+                    }
+                    
+                    this.sessionData = sessionData;
+
+                    // Check if max attendees reached
+                    const currentAttendees = Object.values(sessionData.attendees || {}).length;
+                    if (currentAttendees >= sessionData.maxAttendees) {
+                        this.showSessionFull();
+                        return;
+                    }
+                    
+                    // Set up real-time listener for session status and attendance count
                     const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
                     window.dbOnValue(sessionRef, (snapshot) => {
                         const data = snapshot.val();
@@ -431,30 +456,17 @@
                             this.showClosedSession();
                             return;
                         }
+                        
+                        // Check max attendees in real-time
+                        const attendeeCount = Object.values(data.attendees || {}).length;
+                        if (attendeeCount >= data.maxAttendees) {
+                            this.showSessionFull();
+                            return;
+                        }
+                        
                         this.sessionData = data;
                     });
 
-                    // Only proceed with location and IP checks if session is active
-                    try {
-                        console.log('Fetching IP address...');
-                        const ipResponse = await fetch('https://api.ipify.org?format=json');
-                        const ipData = await ipResponse.json();
-                        this.currentIP = ipData.ip;
-                        console.log('Current IP fetched:', this.currentIP);
-                } catch (error) {
-                        console.warn('Could not get IP:', error);
-                        this.currentIP = 'unknown';
-                    }
-
-                    // If using location verification
-                    if (this.sessionData.useLocation) {
-                        console.log('Location verification required - starting location check');
-                        await this.startLocationCheck();
-                    } else {
-                        console.log('No location verification required - enabling submit button');
-                        document.getElementById('submitBtn').disabled = false;
-                    }
-                    
                     // Set up Firebase references
                     this.sessionRef = sessionRef;
                     this.attendeesRef = window.dbRef(window.database, `sessions/${sessionId}/attendees`);
@@ -462,21 +474,31 @@
                     // Update session info display
                     document.getElementById('displaySubject').textContent = this.sessionData.subject;
                     document.getElementById('displayWeek').textContent = this.sessionData.week;
-                    document.getElementById('maxAttendees').textContent = this.sessionData.maxAttendees;
+                    // Remove attendance count display for students
+                    document.getElementById('attendanceInfo').classList.add('hidden');
                     
                     // Show password field if required
-                        if (this.sessionData.password) {
-                            document.getElementById('passwordField').classList.remove('hidden');
-                        }
+                    if (this.sessionData.password) {
+                        document.getElementById('passwordField').classList.remove('hidden');
+                    }
+
+                    // If using location verification and not TA's IP
+                    if (this.sessionData.useLocation && this.currentIP !== this.sessionData.taIP) {
+                        console.log('Location verification required - starting location check');
+                        await this.startLocationCheck();
+                    } else {
+                        console.log('No location verification required or TA device - enabling submit button');
+                        document.getElementById('submitBtn').disabled = false;
+                    }
 
                     // Show active session UI
                     document.getElementById('loadingSection').classList.add('hidden');
                     document.getElementById('activeSession').classList.remove('hidden');
-
+                    
                     // Update connection status
                     this.updateConnectionStatus('connected');
 
-                    } catch (error) {
+                } catch (error) {
                     console.error('Session initialization error:', error);
                     this.handleInitializationError(error);
                 }
@@ -619,6 +641,16 @@
                 this.cleanup();
             },
 
+            showSessionFull: function() {
+                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('activeSession').classList.add('hidden');
+                document.getElementById('closedSession').classList.add('hidden');
+                document.getElementById('noSession').classList.add('hidden');
+                document.getElementById('sessionFull').classList.remove('hidden');
+                this.updateConnectionStatus('offline');
+                this.cleanup();
+            },
+
             updateAttendanceCount: function() {
                 if (this.sessionData && this.sessionData.attendees) {
                     const attendedCount = this.sessionData.attendees.length;
@@ -637,6 +669,23 @@
 
             verifyLocation: async function() {
                 return new Promise((resolve) => {
+                    // Check if it's TA's IP
+                    if (this.currentIP === this.sessionData.taIP) {
+                        console.log('TA IP match confirmed - enabling submit button');
+                        document.getElementById('submitBtn').disabled = false;
+                        resolve({
+                            success: true,
+                            message: 'Location verified (TA device)',
+                            locationData: {
+                                coordinates: this.sessionData.classLocation,
+                                accuracy: 0,
+                                timestamp: new Date().toISOString(),
+                                distance: 0
+                            }
+                        });
+                        return;
+                    }
+
                     if (!navigator.geolocation) {
                         document.getElementById('submitBtn').disabled = true;
                         this.showLocationStatus(false, 'Your browser does not support location services');
@@ -645,8 +694,8 @@
                             message: 'Your browser does not support location services',
                             locationData: null
                         });
-                    return;
-                }
+                        return;
+                    }
 
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
@@ -811,14 +860,9 @@
             },
 
             showLocationStatus: function(isValid, message, distance, maxDistance) {
-                // Remove any existing location status elements
-                const existingStatuses = document.querySelectorAll('[id^="locationStatus"]');
-                existingStatuses.forEach(status => status.remove());
-
-                const locationStatus = document.createElement('div');
-                locationStatus.id = 'locationStatus';
+                const locationStatus = document.getElementById('locationStatus');
                 locationStatus.className = `alert ${isValid ? 'alert-success' : 'alert-danger'}`;
-                locationStatus.style.marginBottom = '1rem';
+                locationStatus.classList.remove('hidden');
                 
                 let html = `
                     <i class="fas ${isValid ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i> 
@@ -834,11 +878,6 @@
                 }
 
                 locationStatus.innerHTML = html;
-
-                // Insert before the submit button
-                const form = document.getElementById('attendanceForm');
-                const submitBtn = document.getElementById('submitBtn');
-                form.insertBefore(locationStatus, submitBtn);
             },
 
             submitAttendance: async function() {
