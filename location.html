@@ -399,6 +399,41 @@
                 scroll-behavior: auto !important;
             }
         }
+
+        .location-icon {
+            font-size: 2rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            animation: locationPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes locationPulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .location-status {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+        }
+
+        .location-status i {
+            color: var(--primary);
+            animation: locationPulse 1.5s ease-in-out infinite;
+        }
+
+        .location-status.success i {
+            color: var(--success);
+        }
+
+        .location-status.error i {
+            color: var(--danger);
+        }
     </style>
 </head>
 <body>
@@ -635,6 +670,27 @@
                 }
             });
         });
+
+        function showLocationStatus(isValid, message, distance, maxDistance) {
+            const locationStatus = document.getElementById('locationStatus');
+            locationStatus.className = `alert ${isValid ? 'alert-success' : 'alert-danger'}`;
+            locationStatus.classList.remove('hidden');
+            
+            let html = `
+                <i class="fas fa-location-crosshairs location-icon"></i> 
+                ${message}
+            `;
+
+            if (typeof distance !== 'undefined' && !isValid) {
+                html += `
+                    <div style="margin-top: 0.5rem; font-size: 0.9em;">
+                        <strong>You must be within ${maxDistance}m of the room to submit attendance.</strong>
+                    </div>
+                `;
+            }
+
+            locationStatus.innerHTML = html;
+        }
     </script>
 </body>
 </html> 
