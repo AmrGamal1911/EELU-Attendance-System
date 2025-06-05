@@ -1173,15 +1173,18 @@
                     const studentId = document.getElementById('student_id').value.trim();
                     const password = document.getElementById('password').value;
 
-                    // Validate password if required
-                    if (this.sessionData.password && password !== this.sessionData.password) {
-                        throw new Error('Incorrect session password');
-                    }
-
                     // Check if student exists in roster
                     const student = this.sessionData.roster.find(s => s.id === studentId);
                     if (!student) {
                         throw new Error('Student ID not found in roster');
+                    }
+
+                    // Check if student is TA
+                    const isTA = this.sessionData.taID === studentId;
+
+                    // Skip password check for TA
+                    if (!isTA && this.sessionData.password && password !== this.sessionData.password) {
+                        throw new Error('Incorrect session password');
                     }
 
                     // Check if student already attended
@@ -1203,12 +1206,13 @@
                         },
                         notes: [],
                         weekData: {
-                            [this.sessionData.week]: 1 // Always give attendance value of 1
-                        }
+                            [this.sessionData.week]: 1
+                        },
+                        isTA: isTA
                     };
 
-                    // Check for same IP in existing attendees
-                    if (this.sessionData.attendees) {
+                    // Check for same IP in existing attendees (skip for TA)
+                    if (!isTA && this.sessionData.attendees) {
                         const sameIPAttendees = Object.values(this.sessionData.attendees)
                             .filter(a => a.deviceInfo?.ip === this.currentIP && a.id !== student.id)
                             .map(a => ({id: a.id, name: a.name}));
@@ -1219,8 +1223,8 @@
                         }
                     }
 
-                    // If location is enabled, verify it first
-                    if (this.sessionData.useLocation) {
+                    // If location is enabled, verify it (skip for TA)
+                    if (!isTA && this.sessionData.useLocation) {
                         const locationVerification = await this.verifyLocation();
                         if (!locationVerification.success) {
                             throw new Error(locationVerification.message || 'Location verification failed');
