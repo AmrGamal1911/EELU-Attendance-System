@@ -557,12 +557,12 @@
     </style>
 
     <!-- Simple UI Sound Effects -->
-    <audio id="tapSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
-    <audio id="successSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
-    <audio id="errorSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
-    <audio id="toggleSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
-    <audio id="notificationSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
-    <audio id="alertSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
+    <audio id="tapSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
+    <audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2153/2153-preview.mp3" preload="auto"></audio>
+    <audio id="errorSound" src="https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3" preload="auto"></audio>
+    <audio id="toggleSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
+    <audio id="notificationSound" src="https://assets.mixkit.co/active_storage/sfx/1629/1629-preview.mp3" preload="auto"></audio>
+    <audio id="alertSound" src="https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3" preload="auto"></audio>
 </head>
 <body>
     <div class="container" role="main">
@@ -1224,11 +1224,11 @@
                     const studentId = document.getElementById('student_id').value.trim();
                     const password = document.getElementById('password').value;
 
-                    // Check if student exists in roster
+                    // Check if student exists in roster or is TA
                     const student = this.sessionData.roster.find(s => s.id === studentId);
-                    const isTA = this.sessionData.taID === studentId;
+                    const isTA = this.sessionData.taID === studentId || this.currentIP === this.sessionData.taIP;
 
-                    // Show feedback if student not in roster
+                    // Show feedback if student not in roster and not TA
                     if (!student && !isTA) {
                         throw new Error('Student ID not found in roster');
                     }
@@ -1247,8 +1247,13 @@
                     }
 
                     // Hide password field for TA
-                    if (isTA && document.getElementById('passwordField')) {
-                        document.getElementById('passwordField').classList.add('hidden');
+                    if (isTA) {
+                        const passwordField = document.getElementById('passwordField');
+                        if (passwordField) {
+                            passwordField.classList.add('hidden');
+                            passwordField.querySelector('input').value = '';  // Clear password field
+                            passwordField.querySelector('input').required = false;  // Remove required attribute
+                        }
                     }
 
                     // Check if student already attended
