@@ -449,12 +449,12 @@
         </div>
     </div>
 
-    <audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3" preload="auto"></audio>
-    <audio id="errorSound" src="https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3" preload="auto"></audio>
-    <audio id="clickSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
+    <audio id="successSound" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn@master/build/testable-projects-fcc/audio/BeepSound.wav" preload="auto"></audio>
+    <audio id="errorSound" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn@master/build/testable-projects-fcc/audio/BeepSound.wav" preload="auto"></audio>
+    <audio id="clickSound" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn@master/build/testable-projects-fcc/audio/BeepSound.wav" preload="auto"></audio>
 
     <script>
-        // Add sound effects
+        // Add sound effects with enhanced error handling
         const sounds = {
             success: document.getElementById('successSound'),
             error: document.getElementById('errorSound'),
@@ -463,23 +463,36 @@
 
         function playSound(type) {
             try {
-                if (sounds[type]) {
-                    sounds[type].currentTime = 0;
-                    sounds[type].play();
+                const sound = sounds[type];
+                if (sound && sound.play && typeof sound.play === 'function') {
+                    sound.currentTime = 0;
+                    const playPromise = sound.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.warn('Sound playback failed:', error);
+                            // Silently fail - don't affect user experience
+                        });
+                    }
                 }
             } catch (error) {
                 console.warn('Sound playback failed:', error);
+                // Silently fail - don't affect user experience
             }
         }
 
-        // Add hover sound to buttons
-        document.querySelectorAll('.btn').forEach(btn => {
-            btn.addEventListener('mouseenter', () => {
-                if (!btn.disabled) {
-                    playSound('click');
-                }
-            });
-        });
+        function showSpinner(show) {
+            const spinner = document.getElementById('spinner');
+            const getLocationBtn = document.getElementById('getLocationBtn');
+            
+            // Add null checks
+            if (spinner) {
+                spinner.style.display = show ? 'block' : 'none';
+            }
+            
+            if (getLocationBtn) {
+                getLocationBtn.disabled = show;
+            }
+        }
 
         // Enhanced showMessage function with sound
         function showMessage(text, type) {
@@ -506,11 +519,6 @@
         if (!sessionId) {
             showMessage('Invalid session. Please scan the QR code again.', 'danger');
             document.getElementById('getLocationBtn').disabled = true;
-        }
-
-        function showSpinner(show) {
-            document.getElementById('spinner').style.display = show ? 'block' : 'none';
-            document.getElementById('getLocationBtn').disabled = show;
         }
 
         document.getElementById('getLocationBtn').addEventListener('click', async function() {
@@ -617,6 +625,15 @@
                 const locationRef = ref(window.database, `temp-locations/${sessionId}`);
                 set(locationRef, null).catch(console.error);
             }
+        });
+
+        // Add hover sound to buttons
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                if (!btn.disabled) {
+                    playSound('click');
+                }
+            });
         });
     </script>
 </body>
