@@ -1936,166 +1936,245 @@
             },
 
             exportAttendanceReport: async function(sessionId) {
-                const session = this.currentSessions.find(s => s.id === sessionId) || 
-                              JSON.parse(localStorage.getItem('sessions'))?.[sessionId];
-                
-                if (!session) {
-                    this.showMessage('Session not found or already ended', 'danger');
-                    return;
-                }
-                
-                const roster = session.roster || [];
-                const attendees = session.attendees || [];
-                const currentWeek = parseInt(session.week);
-                const subjectName = session.subject;
-                const allWeeks = [...(session.existingWeeks || []), currentWeek].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
-                
-                // IP flags
-                const ipMap = {};
-                attendees.forEach(a => {
-                    if (!a.deviceInfo?.ip) return;
-                    if (!ipMap[a.deviceInfo.ip]) ipMap[a.deviceInfo.ip] = [];
-                    ipMap[a.deviceInfo.ip].push(a.id);
-                });
-
-                const ipNotes = {};
-                Object.entries(ipMap).forEach(([ip, ids]) => {
-                    if (ids.length > 1) {
-                        ids.forEach(id => {
-                            ipNotes[id] = `Same IP with ${ids.filter(x => x !== id).join(', ')}`;
-                        });
-                    }
-                });
-
-                // Final report data
-                const reportData = [];
-                
-                if (session.existingWeeks?.length > 0) {
-                    roster.forEach(student => {
-                        const matched = attendees.find(a => a.id === student.id);
-                        const row = {
-                            'Student ID': student.id,
-                            'Name': student.name,
-                            'Section': student.section || ''
-                        };
+                try {
+                    // First try to get session from current sessions
+                    let session = this.currentSessions.find(s => s.id === sessionId);
+                    
+                    // If not found in current sessions, try to get from history
+                    if (!session) {
+                        const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
+                        const historySession = history.find(s => s.id === sessionId);
                         
-                        allWeeks.forEach(week => {
-                            if (week === currentWeek) {
-                                row[`Week ${week}`] = matched ? 1 : 0;
-                                row[`Timestamp Week ${week}`] = matched ? 
-                                    new Date(matched.timestamp).toLocaleString() : 'N/A';
+                        if (historySession) {
+                            // If session is in history, get complete data from Firebase
+                            const sessionSnapshot = await window.dbGet(window.dbRef(window.database, `sessions/${sessionId}`));
+                            const firebaseData = sessionSnapshot.val();
+                            
+                            if (firebaseData) {
+                                session = {
+                                    ...firebaseData,
+                                    attendees: firebaseData.attendees || historySession.attendeeData || {},
+                                    roster: firebaseData.roster || historySession.roster || []
+                                };
                             } else {
-                                row[`Week ${week}`] = student.weekData?.[week] || 0;
-                                row[`Timestamp Week ${week}`] = student[`Timestamp Week ${week}`] || 'N/A';
+                                session = historySession;
                             }
-                        });
-                        
-                        row['Total Attendance'] = allWeeks.reduce((sum, week) => {
-                            return sum + (Number(row[`Week ${week}`]) || 0);
-                        }, 0);
-
-                        // Add IP note if applicable
-                        const ipNote = ipNotes[student.id] || '';
-                        row['Note'] = ipNote;
-                        
-                        reportData.push(row);
-                    });
-                } else {
-                    roster.forEach(student => {
-                        const matched = attendees.find(a => a.id === student.id);
-                        const row = {
-                            'Student ID': student.id,
-                            'Name': student.name,
-                            'Section': student.section || '',
-                            [`Week ${currentWeek}`]: matched ? 1 : 0,
-                            'Total Attendance': matched ? 1 : 0,
-                            [`Timestamp Week ${currentWeek}`]: matched ? 
-                                new Date(matched.timestamp).toLocaleString() : 'N/A'
-                        };
-
-                        // Add IP note if applicable
-                        const ipNote = ipNotes[student.id] || '';
-                        row['Note'] = ipNote;
-                        
-                        reportData.push(row);
-                    });
-                }
-                
-                // Add flagged submissions at the end
-                attendees.filter(a => a.notes?.length > 0).forEach(flagged => {
-                    if (!reportData.some(r => r['Student ID'] === flagged.id)) {
-                        reportData.push({
-                            'Student ID': flagged.id,
-                            'Name': flagged.name || 'Flagged Submission',
-                            'Section': flagged.section || '',
-                            [`Week ${currentWeek}`]: 0,
-                            'Total Attendance': 0,
-                            [`Timestamp Week ${currentWeek}`]: new Date(flagged.timestamp).toLocaleString(),
-                            'Note': flagged.notes.join('; ')
-                        });
+                        }
                     }
-                });
-                
-                const columnOrder = ['Student ID', 'Name', 'Section'];
-                
-                allWeeks.forEach(week => {
-                    columnOrder.push(`Week ${week}`);
-                });
-                
-                columnOrder.push('Total Attendance');
-                
-                allWeeks.forEach(week => {
-                    columnOrder.push(`Timestamp Week ${week}`);
-                });
 
-                // Add Note and Flagged columns
-                columnOrder.push('Note');
-                
-                const reorderedData = reportData.map(row => {
-                    const newRow = {};
-                    columnOrder.forEach(col => {
-                        if (row[col] !== undefined) {
-                            newRow[col] = row[col];
+                    if (!session) {
+                        this.showMessage('Session data not found', 'danger');
+                        return;
+                    }
+
+                    const roster = session.roster || [];
+                    const attendees = Object.values(session.attendees || {});
+                    const currentWeek = parseInt(session.week);
+                    const subjectName = session.subject;
+                    const allWeeks = [...(session.existingWeeks || []), currentWeek]
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .sort((a, b) => a - b);
+
+                    // IP flags
+                    const ipMap = {};
+                    attendees.forEach(a => {
+                        if (!a.deviceInfo?.ip) return;
+                        if (!ipMap[a.deviceInfo.ip]) ipMap[a.deviceInfo.ip] = [];
+                        ipMap[a.deviceInfo.ip].push(a.id);
+                    });
+
+                    const ipNotes = {};
+                    Object.entries(ipMap).forEach(([ip, ids]) => {
+                        if (ids.length > 1) {
+                            ids.forEach(id => {
+                                ipNotes[id] = `Same IP with ${ids.filter(x => x !== id).join(', ')}`;
+                            });
                         }
                     });
-                    return newRow;
-                });
-                
-                const ws = XLSX.utils.json_to_sheet(reorderedData);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-                
-                const today = new Date();
-                const dateStr = today.toISOString().split('T')[0];
-                let fileName;
-                
-                if (allWeeks.length > 1) {
-                    fileName = `${subjectName} Attendance from Week ${Math.min(...allWeeks)} to ${Math.max(...allWeeks)} ${dateStr}.xlsx`;
-                } else {
-                    fileName = `${subjectName} Attendance for Week ${currentWeek} ${dateStr}.xlsx`;
+
+                    // Final report data
+                    const reportData = [];
+                    
+                    if (session.existingWeeks?.length > 0) {
+                        roster.forEach(student => {
+                            const matched = attendees.find(a => a.id === student.id);
+                            const row = {
+                                'Student ID': student.id,
+                                'Name': student.name,
+                                'Section': student.section || ''
+                            };
+                            
+                            allWeeks.forEach(week => {
+                                if (week === currentWeek) {
+                                    row[`Week ${week}`] = matched ? 1 : 0;
+                                    row[`Timestamp Week ${week}`] = matched ? 
+                                        new Date(matched.timestamp).toLocaleString() : 'N/A';
+                                } else {
+                                    row[`Week ${week}`] = student.weekData?.[week] || 0;
+                                    row[`Timestamp Week ${week}`] = student[`Timestamp Week ${week}`] || 'N/A';
+                                }
+                            });
+                            
+                            row['Total Attendance'] = allWeeks.reduce((sum, week) => {
+                                return sum + (Number(row[`Week ${week}`]) || 0);
+                            }, 0);
+
+                            // Add IP note if applicable
+                            const ipNote = ipNotes[student.id] || '';
+                            row['Note'] = ipNote;
+                            
+                            reportData.push(row);
+                        });
+                    } else {
+                        roster.forEach(student => {
+                            const matched = attendees.find(a => a.id === student.id);
+                            const row = {
+                                'Student ID': student.id,
+                                'Name': student.name,
+                                'Section': student.section || '',
+                                [`Week ${currentWeek}`]: matched ? 1 : 0,
+                                'Total Attendance': matched ? 1 : 0,
+                                [`Timestamp Week ${currentWeek}`]: matched ? 
+                                    new Date(matched.timestamp).toLocaleString() : 'N/A'
+                            };
+
+                            // Add IP note if applicable
+                            const ipNote = ipNotes[student.id] || '';
+                            row['Note'] = ipNote;
+                            
+                            reportData.push(row);
+                        });
+                    }
+                    
+                    // Add flagged submissions at the end
+                    attendees.filter(a => a.notes?.length > 0).forEach(flagged => {
+                        if (!reportData.some(r => r['Student ID'] === flagged.id)) {
+                            reportData.push({
+                                'Student ID': flagged.id,
+                                'Name': flagged.name || 'Flagged Submission',
+                                'Section': flagged.section || '',
+                                [`Week ${currentWeek}`]: 0,
+                                'Total Attendance': 0,
+                                [`Timestamp Week ${currentWeek}`]: new Date(flagged.timestamp).toLocaleString(),
+                                'Note': flagged.notes.join('; ')
+                            });
+                        }
+                    });
+                    
+                    const columnOrder = ['Student ID', 'Name', 'Section'];
+                    
+                    allWeeks.forEach(week => {
+                        columnOrder.push(`Week ${week}`);
+                    });
+                    
+                    columnOrder.push('Total Attendance');
+                    
+                    allWeeks.forEach(week => {
+                        columnOrder.push(`Timestamp Week ${week}`);
+                    });
+
+                    // Add Note and Flagged columns
+                    columnOrder.push('Note');
+                    
+                    const reorderedData = reportData.map(row => {
+                        const newRow = {};
+                        columnOrder.forEach(col => {
+                            if (row[col] !== undefined) {
+                                newRow[col] = row[col];
+                            }
+                        });
+                        return newRow;
+                    });
+                    
+                    const ws = XLSX.utils.json_to_sheet(reorderedData);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+                    
+                    const today = new Date();
+                    const dateStr = today.toISOString().split('T')[0];
+                    let fileName;
+                    
+                    if (allWeeks.length > 1) {
+                        fileName = `${subjectName} Attendance from Week ${Math.min(...allWeeks)} to ${Math.max(...allWeeks)} ${dateStr}.xlsx`;
+                    } else {
+                        fileName = `${subjectName} Attendance for Week ${currentWeek} ${dateStr}.xlsx`;
+                    }
+                    
+                    fileName = fileName.replace(/[^a-zA-Z0-9\s\.\-_]/g, '').replace(/\s+/g, ' ');
+                    XLSX.writeFile(wb, fileName);
+                } catch (error) {
+                    console.error('Error exporting attendance report:', error);
+                    this.showMessage('Failed to export attendance report: ' + error.message, 'danger');
                 }
-                
-                fileName = fileName.replace(/[^a-zA-Z0-9\s\.\-_]/g, '').replace(/\s+/g, ' ');
-                XLSX.writeFile(wb, fileName);
             },
 
             endSession: async function(sessionId) {
                 try {
-                    // Clean up listeners first
+                    // Get current session data first
                     const session = this.currentSessions.find(s => s.id === sessionId);
-                    if (session) {
-                        if (session.attendeesRef) window.dbOff(session.attendeesRef);
-                        if (session.sessionRef) window.dbOff(session.sessionRef);
-                        this.currentSessions = this.currentSessions.filter(s => s.id !== sessionId);
+                    if (!session) {
+                        this.showMessage('Session not found', 'danger');
+                        return;
                     }
+
+                    // Get final attendance data
+                    const attendeesSnapshot = await window.dbGet(window.dbRef(window.database, `sessions/${sessionId}/attendees`));
+                    const finalAttendees = attendeesSnapshot.val() || {};
+                    
+                    // Clean up listeners first
+                    if (session.attendeesRef) window.dbOff(session.attendeesRef);
+                    if (session.sessionRef) window.dbOff(session.sessionRef);
+                    this.currentSessions = this.currentSessions.filter(s => s.id !== sessionId);
+
+                    // Create complete session data
+                    const completeSessionData = {
+                        ...session,
+                        active: false,
+                        endedAt: Date.now(),
+                        attendees: finalAttendees,
+                        attendeeCount: Object.keys(finalAttendees).length
+                    };
 
                     // Update session status in Firebase
                     const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
-                    await window.dbSet(sessionRef, { 
-                        ...session,
-                        active: false,
-                        endedAt: Date.now()
-                    });
+                    await window.dbSet(sessionRef, completeSessionData);
+
+                    // Save complete data to local storage
+                    const sessions = JSON.parse(localStorage.getItem('sessions') || '{}');
+                    sessions[sessionId] = completeSessionData;
+                    localStorage.setItem('sessions', JSON.stringify(sessions));
+
+                    // Update session in history with complete data
+                    const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
+                    const sessionIndex = history.findIndex(s => s.id === sessionId);
+                    if (sessionIndex !== -1) {
+                        history[sessionIndex] = {
+                            id: sessionId,
+                            subject: completeSessionData.subject,
+                            week: completeSessionData.week,
+                            date: new Date().toISOString(),
+                            attendees: completeSessionData.attendeeCount,
+                            maxAttendees: completeSessionData.maxAttendees,
+                            active: false,
+                            roster: completeSessionData.roster,
+                            attendeeData: finalAttendees,
+                            deviceId: this.deviceId
+                        };
+                    } else {
+                        history.unshift({
+                            id: sessionId,
+                            subject: completeSessionData.subject,
+                            week: completeSessionData.week,
+                            date: new Date().toISOString(),
+                            attendees: completeSessionData.attendeeCount,
+                            maxAttendees: completeSessionData.maxAttendees,
+                            active: false,
+                            roster: completeSessionData.roster,
+                            attendeeData: finalAttendees,
+                            deviceId: this.deviceId
+                        });
+                    }
+                    localStorage.setItem('sessionHistory', JSON.stringify(history));
 
                     this.showMessage('Session ended successfully.', 'success');
 
@@ -2120,19 +2199,12 @@
                         `;
                     }
 
-                    // Update session in history
-                    const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
-                    const sessionIndex = history.findIndex(s => s.id === sessionId);
-                    if (sessionIndex !== -1) {
-                        history[sessionIndex].active = false;
-                        localStorage.setItem('sessionHistory', JSON.stringify(history));
-                        this.renderSessionHistory();
-                    }
-
+                    this.renderSessionHistory();
                     this.clearSessionInputs();
+
                 } catch (error) {
                     console.error('Error ending session:', error);
-                    this.showMessage('Failed to end session. Please try again.', 'danger');
+                    this.showMessage('Failed to end session: ' + error.message, 'danger');
                 }
             },
 
