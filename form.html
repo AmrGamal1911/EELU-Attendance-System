@@ -556,9 +556,13 @@
         }
     </style>
 
-    <audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3" preload="auto"></audio>
-    <audio id="errorSound" src="https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3" preload="auto"></audio>
-    <audio id="clickSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
+    <!-- Professional UI Sound Effects -->
+    <audio id="tapSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/tap.mp3" preload="auto"></audio>
+    <audio id="successSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/celebration.mp3" preload="auto"></audio>
+    <audio id="errorSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/caution.mp3" preload="auto"></audio>
+    <audio id="toggleSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/toggle.mp3" preload="auto"></audio>
+    <audio id="notificationSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/notification.mp3" preload="auto"></audio>
+    <audio id="alertSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/alert.mp3" preload="auto"></audio>
 </head>
 <body>
     <div class="container" role="main">
@@ -642,10 +646,16 @@
             deviceId: localStorage.getItem('deviceId') || Date.now().toString(),
             currentIP: null,
             sounds: {
+                tap: document.getElementById('tapSound'),
                 success: document.getElementById('successSound'),
                 error: document.getElementById('errorSound'),
-                click: document.getElementById('clickSound')
+                toggle: document.getElementById('toggleSound'),
+                notification: document.getElementById('notificationSound'),
+                alert: document.getElementById('alertSound')
             },
+            
+            lastPlayTime: 0,
+            DEBOUNCE_TIME: 100, // ms
 
             init: async function() {
                 console.log('Initializing form...');
@@ -1023,9 +1033,19 @@
 
             playSound: function(type) {
                 try {
-                    if (this.sounds[type]) {
-                        this.sounds[type].currentTime = 0;
-                        this.sounds[type].play();
+                    const now = Date.now();
+                    if (now - this.lastPlayTime < this.DEBOUNCE_TIME) return;
+                    
+                    const sound = this.sounds[type];
+                    if (sound) {
+                        sound.currentTime = 0;
+                        const playPromise = sound.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(error => {
+                                console.warn('Sound playback failed:', error);
+                            });
+                        }
+                        this.lastPlayTime = now;
                     }
                 } catch (error) {
                     console.warn('Sound playback failed:', error);
@@ -1175,12 +1195,20 @@
 
                     // Check if student exists in roster
                     const student = this.sessionData.roster.find(s => s.id === studentId);
-                    if (!student) {
+                    const isTA = this.sessionData.taID === studentId;
+
+                    // Show feedback if student not in roster
+                    if (!student && !isTA) {
                         throw new Error('Student ID not found in roster');
                     }
 
-                    // Check if student is TA
-                    const isTA = this.sessionData.taID === studentId;
+                    // Get student info (for TA, create a special entry)
+                    const attendeeInfo = isTA ? {
+                        id: studentId,
+                        name: 'Teaching Assistant',
+                        section: 'Staff',
+                        isTA: true
+                    } : student;
 
                     // Skip password check for TA
                     if (!isTA && this.sessionData.password && password !== this.sessionData.password) {
@@ -1195,9 +1223,9 @@
 
                     // Prepare attendance data
                     const attendanceData = {
-                        id: student.id,
-                        name: student.name,
-                        section: student.section,
+                        id: attendeeInfo.id,
+                        name: attendeeInfo.name,
+                        section: attendeeInfo.section,
                         timestamp: new Date().toISOString(),
                         deviceInfo: {
                             id: this.deviceId,
@@ -1308,10 +1336,32 @@
             
             // Add sound effects to buttons
             const submitBtn = document.getElementById('submitBtn');
-            submitBtn.addEventListener('mouseenter', () => {
-                if (!submitBtn.disabled) {
-                    formApp.playSound('click');
-                }
+            // Add sound effects to buttons
+            document.querySelectorAll('.btn').forEach(btn => {
+                btn.addEventListener('mouseenter', () => {
+                    if (!btn.disabled) {
+                        formApp.playSound('tap');
+                    }
+                });
+                btn.addEventListener('click', () => {
+                    if (!btn.disabled) {
+                        formApp.playSound('toggle');
+                    }
+                });
+            });
+
+            // Add sound effects to form submissions
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', () => {
+                    formApp.playSound('success');
+                });
+            });
+
+            // Add sound effects to inputs
+            document.querySelectorAll('input').forEach(input => {
+                input.addEventListener('focus', () => {
+                    formApp.playSound('tap');
+                });
             });
             
             // Clean up when page is closed
