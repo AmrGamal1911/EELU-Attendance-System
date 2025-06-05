@@ -423,6 +423,12 @@
             }
         }
         
+        @keyframes highlightCard {
+            0% { transform: translateY(0); box-shadow: var(--shadow-lg); }
+            50% { transform: translateY(-10px); box-shadow: var(--shadow-lg), 0 30px 60px -15px rgba(79, 70, 229, 0.3); }
+            100% { transform: translateY(0); box-shadow: var(--shadow-lg); }
+        }
+        
         .hidden {
             display: none !important;
         }
@@ -1256,6 +1262,12 @@
             100% {
                 background-position: 1000px 0;
             }
+        }
+        
+        @keyframes highlightCard {
+            0% { transform: translateY(0); box-shadow: var(--shadow-lg); }
+            50% { transform: translateY(-10px); box-shadow: var(--shadow-lg), 0 30px 60px -15px rgba(79, 70, 229, 0.3); }
+            100% { transform: translateY(0); box-shadow: var(--shadow-lg); }
         }
         
         .hidden {
@@ -2269,71 +2281,75 @@
     </style>
 
     <!-- Professional UI Sound Effects -->
-    <script src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/browser/snd.js?kit=02"></script>
+    <audio id="tapSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/tap.mp3" preload="auto"></audio>
+    <audio id="successSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/celebration.mp3" preload="auto"></audio>
+    <audio id="errorSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/caution.mp3" preload="auto"></audio>
+    <audio id="toggleSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/toggle.mp3" preload="auto"></audio>
+    <audio id="notificationSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/notification.mp3" preload="auto"></audio>
+    <audio id="alertSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/alert.mp3" preload="auto"></audio>
 
     <script>
-        // Initialize SND library
-        const snd = new Snd();
-        
-        // Load piano kit for more professional sounds
-        snd.load(Snd.KITS.SND02).then(() => {
-            console.log('Sound effects loaded');
-        });
+        // Sound management
+        const sounds = {
+            tap: document.getElementById('tapSound'),
+            success: document.getElementById('successSound'),
+            error: document.getElementById('errorSound'),
+            toggle: document.getElementById('toggleSound'),
+            notification: document.getElementById('notificationSound'),
+            alert: document.getElementById('alertSound')
+        };
 
-        // Enhanced sound playback function
+        let lastPlayTime = 0;
+        const DEBOUNCE_TIME = 100; // ms
+
         function playSound(type) {
             try {
-                switch(type) {
-                    case 'success':
-                        snd.play(Snd.SOUNDS.CELEBRATION);
-                        break;
-                    case 'error':
-                        snd.play(Snd.SOUNDS.CAUTION);
-                        break;
-                    case 'click':
-                        snd.play(Snd.SOUNDS.TAP);
-                        break;
-                    case 'toggle':
-                        snd.play(Snd.SOUNDS.TOGGLE);
-                        break;
-                    case 'notification':
-                        snd.play(Snd.SOUNDS.NOTIFICATION);
-                        break;
-                    case 'alert':
-                        snd.play(Snd.SOUNDS.ALERT);
-                        break;
-                    default:
-                        snd.play(Snd.SOUNDS.TAP);
+                const now = Date.now();
+                if (now - lastPlayTime < DEBOUNCE_TIME) return;
+                
+                const sound = sounds[type];
+                if (sound) {
+                    sound.currentTime = 0;
+                    const playPromise = sound.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.warn('Sound playback failed:', error);
+                        });
+                    }
+                    lastPlayTime = now;
                 }
             } catch (error) {
                 console.warn('Sound playback failed:', error);
             }
         }
 
-        // Add hover sound effects to buttons with debounce
-        let lastPlayTime = 0;
-        const DEBOUNCE_TIME = 100; // ms
-
+        // Add sound effects to buttons
         document.querySelectorAll('.btn').forEach(btn => {
             btn.addEventListener('mouseenter', () => {
-                const now = Date.now();
-                if (!btn.disabled && now - lastPlayTime > DEBOUNCE_TIME) {
-                    playSound('click');
-                    lastPlayTime = now;
+                if (!btn.disabled) {
+                    playSound('tap');
+                }
+            });
+            btn.addEventListener('click', () => {
+                if (!btn.disabled) {
+                    playSound('toggle');
                 }
             });
         });
 
-        // Add success/error sounds to appropriate actions
-        function showSuccess(message) {
-            playSound('success');
-            // ... existing success handling ...
-        }
+        // Add sound effects to form submissions
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', () => {
+                playSound('success');
+            });
+        });
 
-        function showError(message) {
-            playSound('error');
-            // ... existing error handling ...
-        }
+        // Add sound effects to toggles
+        document.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(input => {
+            input.addEventListener('change', () => {
+                playSound('toggle');
+            });
+        });
 
         // ... rest of your existing JavaScript ...
     </script>
@@ -2923,6 +2939,20 @@
                                 app.showMessage('Attendance session started successfully!', 'success');
                                 app.addToSessionHistory(sessionData);
                                 document.getElementById('sessionHistoryCard').classList.remove('hidden');
+                                
+                                // Auto-scroll to session card with animation
+                                const sessionCard = document.querySelector('.session-card');
+                                if (sessionCard) {
+                                    sessionCard.scrollIntoView({ 
+                                        behavior: 'smooth',
+                                        block: 'start'
+                                    });
+                                    
+                                    // Add highlight animation
+                                    sessionCard.style.animation = 'none';
+                                    sessionCard.offsetHeight; // Trigger reflow
+                                    sessionCard.style.animation = 'highlightCard 1s ease-out';
+                                }
                                 
                             } catch (error) {
                                 console.error('Error creating session:', error);
@@ -4340,6 +4370,13 @@
 
         function initSpeechRecognition() {
             try {
+                if (recognition) {
+                    recognition.onend = null;
+                    recognition.onresult = null;
+                    recognition.onerror = null;
+                    recognition = null;
+                }
+
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 recognition = new SpeechRecognition();
                 recognition.continuous = false;
@@ -4352,50 +4389,81 @@
                     
                     if (command.includes('launch') || command.includes('start') || command.includes('create')) {
                         document.getElementById('createSessionBtn').click();
+                        // Auto scroll to session card
+                        setTimeout(() => {
+                            const sessionCard = document.querySelector('.session-card');
+                            if (sessionCard) {
+                                sessionCard.scrollIntoView({ 
+                                    behavior: 'smooth',
+                                    block: 'start'
+                                });
+                            }
+                        }, 1000);
                     }
                 };
 
                 recognition.onend = function() {
                     isRecognizing = false;
-                    if (document.getElementById('voiceCommandBtn').classList.contains('listening')) {
-                        document.getElementById('voiceCommandBtn').classList.remove('listening');
+                    const voiceBtn = document.getElementById('voiceCommandBtn');
+                    if (voiceBtn && voiceBtn.classList.contains('listening')) {
+                        voiceBtn.classList.remove('listening');
                     }
                 };
 
                 recognition.onerror = function(event) {
                     console.error('Speech recognition error:', event.error);
                     isRecognizing = false;
-                    if (document.getElementById('voiceCommandBtn').classList.contains('listening')) {
-                        document.getElementById('voiceCommandBtn').classList.remove('listening');
+                    const voiceBtn = document.getElementById('voiceCommandBtn');
+                    if (voiceBtn && voiceBtn.classList.contains('listening')) {
+                        voiceBtn.classList.remove('listening');
+                    }
+                    
+                    // Reset recognition on error
+                    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                        recognition = null;
                     }
                 };
 
             } catch (error) {
                 console.error('Speech recognition not supported:', error);
+                recognition = null;
             }
         }
 
         function toggleSpeechRecognition() {
-            if (!recognition) {
-                initSpeechRecognition();
-            }
-
             try {
-                if (!isRecognizing) {
+                if (isRecognizing) {
+                    if (recognition) {
+                        recognition.stop();
+                    }
+                    isRecognizing = false;
+                    const voiceBtn = document.getElementById('voiceCommandBtn');
+                    if (voiceBtn) {
+                        voiceBtn.classList.remove('listening');
+                    }
+                    return;
+                }
+
+                if (!recognition) {
+                    initSpeechRecognition();
+                }
+
+                if (recognition) {
                     recognition.start();
                     isRecognizing = true;
-                    document.getElementById('voiceCommandBtn').classList.add('listening');
-                } else {
-                    recognition.stop();
-                    isRecognizing = false;
-                    document.getElementById('voiceCommandBtn').classList.remove('listening');
+                    const voiceBtn = document.getElementById('voiceCommandBtn');
+                    if (voiceBtn) {
+                        voiceBtn.classList.add('listening');
+                    }
                 }
             } catch (error) {
                 console.error('Speech recognition error:', error);
                 isRecognizing = false;
-                if (document.getElementById('voiceCommandBtn').classList.contains('listening')) {
-                    document.getElementById('voiceCommandBtn').classList.remove('listening');
+                const voiceBtn = document.getElementById('voiceCommandBtn');
+                if (voiceBtn && voiceBtn.classList.contains('listening')) {
+                    voiceBtn.classList.remove('listening');
                 }
+                recognition = null;
             }
         }
 
