@@ -556,13 +556,13 @@
         }
     </style>
 
-    <!-- Professional UI Sound Effects -->
-    <audio id="tapSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/tap.mp3" preload="auto"></audio>
-    <audio id="successSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/celebration.mp3" preload="auto"></audio>
-    <audio id="errorSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/caution.mp3" preload="auto"></audio>
-    <audio id="toggleSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/toggle.mp3" preload="auto"></audio>
-    <audio id="notificationSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/notification.mp3" preload="auto"></audio>
-    <audio id="alertSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/alert.mp3" preload="auto"></audio>
+    <!-- Simple UI Sound Effects -->
+    <audio id="tapSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
+    <audio id="successSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
+    <audio id="errorSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
+    <audio id="toggleSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
+    <audio id="notificationSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
+    <audio id="alertSound" src="data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIC0gTFNXIChMYXNlciBTd2l0Y2gpAFRJVDIAAAAcAAAATGFzZXIgU3dpdGNoIC0gU0ZYIEVmZmVjdCBMU1cAVFlFUgAAAAUAAAAyMDE1AA=="></audio>
 </head>
 <body>
     <div class="container" role="main">
@@ -659,6 +659,13 @@
 
             init: async function() {
                 console.log('Initializing form...');
+                
+                // Initialize sounds
+                Object.values(this.sounds).forEach(sound => {
+                    sound.load();
+                    // Set initial volume
+                    sound.volume = 0.3;
+                });
                 const urlParams = new URLSearchParams(window.location.search);
                 const sessionId = urlParams.get('session');
                 
@@ -1041,15 +1048,35 @@
                     if (now - this.lastPlayTime < this.DEBOUNCE_TIME) return;
                     
                     const sound = this.sounds[type];
-                    if (sound) {
-                        sound.currentTime = 0;
-                        const playPromise = sound.play();
-                        if (playPromise !== undefined) {
-                            playPromise.catch(error => {
+                    if (!sound) {
+                        console.warn('Sound not found:', type);
+                        return;
+                    }
+
+                    // Create a new Audio instance for each play to avoid conflicts
+                    const audioClone = new Audio();
+                    audioClone.src = sound.src;
+                    
+                    // Set volume to a reasonable level
+                    audioClone.volume = 0.3;
+                    
+                    const playPromise = audioClone.play();
+                    if (playPromise !== undefined) {
+                        playPromise
+                            .then(() => {
+                                this.lastPlayTime = now;
+                                // Clean up after playing
+                                audioClone.onended = () => {
+                                    audioClone.src = '';
+                                    audioClone.remove();
+                                };
+                            })
+                            .catch(error => {
                                 console.warn('Sound playback failed:', error);
+                                // Try alternative playback method
+                                sound.currentTime = 0;
+                                sound.play().catch(e => console.warn('Fallback playback failed:', e));
                             });
-                        }
-                        this.lastPlayTime = now;
                     }
                 } catch (error) {
                     console.warn('Sound playback failed:', error);
