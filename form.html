@@ -342,6 +342,9 @@
                 <div class="session-info">
                     <p><strong><i class="fas fa-book"></i> Subject:</strong> <span id="displaySubject">-</span></p>
                     <p><strong><i class="fas fa-calendar-week"></i> Week:</strong> <span id="displayWeek">-</span></p>
+                    <div id="attendanceInfo" class="hidden">
+                        <p><strong><i class="fas fa-users"></i> Attendance:</strong> <span id="attendedCount">0</span>/<span id="maxAttendees">-</span></p>
+                    </div>
                 </div>
                 
                 <div id="message" class="alert hidden"></div>
@@ -474,8 +477,6 @@
                     // Update session info display
                     document.getElementById('displaySubject').textContent = this.sessionData.subject;
                     document.getElementById('displayWeek').textContent = this.sessionData.week;
-                    // Remove attendance count display for students
-                    document.getElementById('attendanceInfo').classList.add('hidden');
                     
                     // Show password field if required
                     if (this.sessionData.password) {
