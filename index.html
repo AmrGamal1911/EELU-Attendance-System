@@ -2278,6 +2278,43 @@
             50% { transform: translateY(-10px); box-shadow: var(--shadow-lg), 0 30px 60px -15px rgba(79, 70, 229, 0.3); }
             100% { transform: translateY(0); box-shadow: var(--shadow-lg); }
         }
+
+        .session-status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding: 0.875rem 1.25rem;
+            border-radius: var(--border-radius);
+            background: var(--gradient-light);
+            border: 1px solid rgba(79, 70, 229, 0.1);
+            font-size: 0.95rem;
+        }
+
+        .session-status .fa-broadcast-tower {
+            animation: towerPulse 1.5s ease-in-out infinite;
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+
+        @keyframes towerPulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2) translateY(-2px); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .session-card {
+            animation: highlightCard 1s ease-out;
+            transform-origin: center;
+            will-change: transform;
+        }
+
+        @keyframes highlightCard {
+            0% { transform: translateY(0); box-shadow: var(--shadow-lg); }
+            50% { transform: translateY(-10px); box-shadow: var(--shadow-lg), 0 30px 60px -15px rgba(79, 70, 229, 0.3); }
+            100% { transform: translateY(0); box-shadow: var(--shadow-lg); }
+        }
     </style>
 
     <!-- Professional UI Sound Effects -->
