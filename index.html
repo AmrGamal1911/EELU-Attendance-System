@@ -2122,7 +2122,7 @@
             endSession: async function(sessionId) {
                 try {
                     // Get current session data first
-                    const session = this.currentSessions.find(s => s.id === sessionId);
+                    let session = this.currentSessions.find(s => s.id === sessionId);
                     if (!session) {
                         const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
                         const sessionSnapshot = await window.dbGet(sessionRef);
