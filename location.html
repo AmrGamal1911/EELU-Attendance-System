@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Set class location for attendance tracking">
     <title>Set Class Location | EELU</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
@@ -44,92 +45,178 @@
     
     <style>
         :root {
-            --primary: #667eea;
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --secondary: #7c3aed;
             --success: #10b981;
             --danger: #ef4444;
+            --warning: #f59e0b;
             --info: #3b82f6;
-            --border-radius: 12px;
+            --light-bg: #f8fafc;
+            --dark: #1f2937;
+            --gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            --gradient-light: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%);
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --border-radius: 16px;
+            --border-radius-lg: 20px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --font-primary: 'Poppins', system-ui, -apple-system, sans-serif;
+            --font-secondary: 'Inter', system-ui, -apple-system, sans-serif;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: var(--font-secondary);
+            background: var(--light-bg);
+            color: var(--dark);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 1rem;
-            background: #f8fafc;
+            padding: 1.5rem;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(79, 70, 229, 0.05) 0%, rgba(124, 58, 237, 0.05) 90%),
+                linear-gradient(to bottom right, rgba(79, 70, 229, 0.02) 0%, rgba(124, 58, 237, 0.02) 100%);
+            line-height: 1.5;
         }
-        
+
         .container {
-            max-width: 500px;
+            max-width: 550px;
             width: 100%;
             text-align: center;
-            padding: 2rem;
+            padding: 2.5rem;
             background: white;
-            border-radius: var(--border-radius);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+            animation: fadeScale 0.6s ease-out;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient);
+            animation: shimmer 2s infinite linear;
+            background-size: 1000px 100%;
+        }
+
         h1 {
+            font-family: var(--font-primary);
             margin-bottom: 2rem;
             color: var(--primary);
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 0.75rem;
+            font-size: clamp(1.5rem, 5vw, 2rem);
+            font-weight: 600;
+            letter-spacing: -0.02em;
         }
-        
+
+        h1 i {
+            font-size: 1.8rem;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: float 3s ease-in-out infinite;
+        }
+
         .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--gradient);
             color: white;
             border: none;
-            padding: 1rem 2rem;
+            padding: 1rem 1.5rem;
             border-radius: var(--border-radius);
             font-size: 1rem;
+            font-weight: 600;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 0.75rem;
-            margin: 0 auto;
-            transition: transform 0.2s;
+            transition: var(--transition);
             width: 100%;
+            position: relative;
+            overflow: hidden;
         }
-        
+
+        .btn:focus-visible {
+            outline: 3px solid rgba(79, 70, 229, 0.5);
+            outline-offset: 2px;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.5s ease;
+        }
+
         .btn:hover {
             transform: translateY(-2px);
+            box-shadow: var(--shadow);
         }
-        
+
+        .btn:hover::before {
+            transform: translateX(100%);
+        }
+
         .btn:disabled {
-            opacity: 0.7;
+            background: #d1d5db;
             cursor: not-allowed;
             transform: none;
         }
 
-        .btn-success {
-            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+        .btn i {
+            font-size: 1.2rem;
+            transition: transform 0.3s ease;
         }
-        
+
+        .btn:hover i {
+            transform: rotate(15deg);
+        }
+
         .alert {
-            padding: 1rem;
+            padding: 1.25rem;
             border-radius: var(--border-radius);
-            margin-bottom: 1rem;
-            display: none;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease-out;
+            font-weight: 500;
         }
-        
+
+        .alert i {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
         .alert-success {
             background: rgba(16, 185, 129, 0.1);
             color: #047857;
             border: 1px solid rgba(16, 185, 129, 0.2);
         }
-        
+
         .alert-danger {
             background: rgba(239, 68, 68, 0.1);
             color: #b91c1c;
@@ -140,40 +227,54 @@
             background: rgba(59, 130, 246, 0.1);
             color: #1e40af;
             border: 1px solid rgba(59, 130, 246, 0.2);
-            display: block;
-        }
-        
-        .spinner {
-            border: 3px solid rgba(102, 126, 234, 0.2);
-            border-top: 3px solid var(--primary);
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-            margin: 1rem auto;
-            display: none;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
 
         .location-section {
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .location-indicator {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto;
+            background: var(--gradient-light);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse 2s infinite;
+        }
+
+        .location-indicator i {
+            font-size: 2rem;
+            color: var(--primary);
+            animation: float 3s ease-in-out infinite;
         }
 
         .status-container {
             margin-top: 1rem;
+            position: relative;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(79, 70, 229, 0.1);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 1.5rem auto;
         }
 
         .form-section {
-            background: #f8fafc;
-            padding: 1.5rem;
+            background: var(--gradient-light);
+            padding: 2rem;
             border-radius: var(--border-radius);
-            border: 1px solid #e5e7eb;
+            border: 1px solid rgba(79, 70, 229, 0.1);
+            animation: slideIn 0.5s ease-out;
         }
 
         .form-section.hidden {
@@ -181,77 +282,230 @@
         }
 
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             text-align: left;
         }
 
         .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
             font-weight: 500;
-            color: #374151;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .form-group label i {
+            color: var(--primary);
         }
 
         .form-control {
             width: 100%;
-            padding: 0.75rem 1rem;
-            border: 1px solid #e5e7eb;
+            padding: 1rem 1.25rem;
+            border: 2px solid rgba(79, 70, 229, 0.1);
             border-radius: var(--border-radius);
             font-size: 1rem;
-            transition: all 0.3s ease;
+            transition: var(--transition);
+            background: white;
+        }
+
+        .form-control:hover {
+            border-color: var(--primary-dark);
         }
 
         .form-control:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+
+        @keyframes fadeScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); }
+            70% { box-shadow: 0 0 0 20px rgba(79, 70, 229, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0); }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 1.75rem;
+                margin: 1rem;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .btn {
+                padding: 0.875rem 1.25rem;
+            }
+
+            .form-section {
+                padding: 1.5rem;
+            }
+
+            .location-indicator {
+                width: 60px;
+                height: 60px;
+            }
+
+            .location-indicator i {
+                font-size: 1.5rem;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1><i class="fas fa-map-marker-alt"></i> Set Class Location</h1>
-        <div id="message" class="alert"></div>
+    <div class="container" role="main">
+        <h1><i class="fas fa-map-marker-alt" aria-hidden="true"></i> Set Class Location</h1>
+        <div id="message" class="alert" role="alert" aria-live="polite"></div>
         
         <div class="location-section">
-            <div id="spinner" class="spinner"></div>
-            <button id="getLocationBtn" class="btn">
-                <i class="fas fa-location-arrow"></i> Get Current Location
+            <div class="location-indicator" role="presentation">
+                <i class="fas fa-location-crosshairs" aria-hidden="true"></i>
+            </div>
+            
+            <button id="getLocationBtn" class="btn" aria-label="Get current location">
+                <i class="fas fa-compass" aria-hidden="true"></i> Get Current Location
             </button>
             
-            <div id="locationStatus" class="status-container">
+            <div id="locationStatus" class="status-container" role="status" aria-live="polite">
                 <div class="alert alert-info">
-                    Waiting for location...
+                    <i class="fas fa-info-circle" aria-hidden="true"></i>
+                    <span>Waiting for location...</span>
                 </div>
             </div>
             
             <div id="locationNameForm" class="form-section hidden">
                 <div class="form-group">
-                    <label for="locationName">Location Name:</label>
-                    <input type="text" id="locationName" class="form-control" placeholder="e.g., Room 101" required>
+                    <label for="locationName">
+                        <i class="fas fa-tag" aria-hidden="true"></i>
+                        Location Name
+                    </label>
+                    <input 
+                        type="text" 
+                        id="locationName" 
+                        class="form-control" 
+                        placeholder="e.g., Room 101" 
+                        required
+                        aria-required="true"
+                        aria-label="Enter location name"
+                    >
                 </div>
-                <button onclick="saveLocation()" class="btn btn-success">
-                    <i class="fas fa-save"></i> Save Location
+                <button 
+                    onclick="saveLocation()" 
+                    class="btn btn-success"
+                    aria-label="Save location"
+                >
+                    <i class="fas fa-check-circle" aria-hidden="true"></i> Save Location
                 </button>
             </div>
         </div>
     </div>
 
+    <audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3" preload="auto"></audio>
+    <audio id="errorSound" src="https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3" preload="auto"></audio>
+    <audio id="clickSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
+
     <script>
-        // Get session ID from URL
+        // Add sound effects
+        const sounds = {
+            success: document.getElementById('successSound'),
+            error: document.getElementById('errorSound'),
+            click: document.getElementById('clickSound')
+        };
+
+        function playSound(type) {
+            try {
+                if (sounds[type]) {
+                    sounds[type].currentTime = 0;
+                    sounds[type].play();
+                }
+            } catch (error) {
+                console.warn('Sound playback failed:', error);
+            }
+        }
+
+        // Add hover sound to buttons
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                if (!btn.disabled) {
+                    playSound('click');
+                }
+            });
+        });
+
+        // Enhanced showMessage function with sound
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            const icon = type === 'success' ? 'check-circle' : 
+                        type === 'danger' ? 'exclamation-circle' : 
+                        'info-circle';
+            
+            messageDiv.innerHTML = `
+                <i class="fas fa-${icon}"></i>
+                <span>${text}</span>
+            `;
+            messageDiv.className = `alert alert-${type}`;
+            messageDiv.style.display = 'flex';
+            
+            playSound(type === 'success' ? 'success' : 
+                     type === 'danger' ? 'error' : 'click');
+        }
+
+        // Original initialization code
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get('session');
 
         if (!sessionId) {
             showMessage('Invalid session. Please scan the QR code again.', 'danger');
             document.getElementById('getLocationBtn').disabled = true;
-        }
-
-        function showMessage(text, type) {
-            const messageDiv = document.getElementById('message');
-            messageDiv.textContent = text;
-            messageDiv.className = `alert alert-${type}`;
-            messageDiv.style.display = 'block';
         }
 
         function showSpinner(show) {
