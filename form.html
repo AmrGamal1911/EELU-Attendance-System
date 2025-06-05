@@ -732,8 +732,8 @@
                     document.getElementById('displaySubject').textContent = this.sessionData.subject;
                     document.getElementById('displayWeek').textContent = this.sessionData.week;
                     
-                    // Show password field if required
-                    if (this.sessionData.password) {
+                    // Show password field if required (except for TA)
+                    if (this.sessionData.password && this.currentIP !== this.sessionData.taIP) {
                         document.getElementById('passwordField').classList.remove('hidden');
                     }
 
@@ -744,6 +744,10 @@
                     } else {
                         console.log('No location verification required or TA device - enabling submit button');
                         document.getElementById('submitBtn').disabled = false;
+                        // For TA, show success status
+                        if (this.currentIP === this.sessionData.taIP) {
+                            this.showLocationStatus(true, 'Location verified (TA device)');
+                        }
                     }
 
                     // Show active session UI
@@ -1213,6 +1217,11 @@
                     // Skip password check for TA
                     if (!isTA && this.sessionData.password && password !== this.sessionData.password) {
                         throw new Error('Incorrect session password');
+                    }
+
+                    // Hide password field for TA
+                    if (isTA && document.getElementById('passwordField')) {
+                        document.getElementById('passwordField').classList.add('hidden');
                     }
 
                     // Check if student already attended
