@@ -363,6 +363,12 @@
             100% { background-position: 1000px 0; }
         }
 
+        @keyframes locationPulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
         @media (max-width: 640px) {
             .container {
                 padding: 1.75rem;
@@ -434,6 +440,11 @@
         .location-status.error i {
             color: var(--danger);
         }
+
+        .fas.fa-location-crosshairs {
+            animation: locationPulse 1.5s ease-in-out infinite;
+            color: var(--primary);
+        }
     </style>
 </head>
 <body>
@@ -484,17 +495,27 @@
         </div>
     </div>
 
-    <audio id="successSound" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn@master/build/testable-projects-fcc/audio/BeepSound.wav" preload="auto"></audio>
-    <audio id="errorSound" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn@master/build/testable-projects-fcc/audio/BeepSound.wav" preload="auto"></audio>
-    <audio id="clickSound" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn@master/build/testable-projects-fcc/audio/BeepSound.wav" preload="auto"></audio>
+    <!-- Professional UI Sound Effects -->
+    <audio id="tapSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/tap.mp3" preload="auto"></audio>
+    <audio id="successSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/celebration.mp3" preload="auto"></audio>
+    <audio id="errorSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/caution.mp3" preload="auto"></audio>
+    <audio id="toggleSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/toggle.mp3" preload="auto"></audio>
+    <audio id="notificationSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/notification.mp3" preload="auto"></audio>
+    <audio id="alertSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/alert.mp3" preload="auto"></audio>
 
     <script>
         // Add sound effects with enhanced error handling
         const sounds = {
+            tap: document.getElementById('tapSound'),
             success: document.getElementById('successSound'),
             error: document.getElementById('errorSound'),
-            click: document.getElementById('clickSound')
+            toggle: document.getElementById('toggleSound'),
+            notification: document.getElementById('notificationSound'),
+            alert: document.getElementById('alertSound')
         };
+
+        let lastPlayTime = 0;
+        const DEBOUNCE_TIME = 100; // ms
 
         function playSound(type) {
             try {
@@ -662,12 +683,31 @@
             }
         });
 
-        // Add hover sound to buttons
+        // Add sound effects to buttons
         document.querySelectorAll('.btn').forEach(btn => {
             btn.addEventListener('mouseenter', () => {
                 if (!btn.disabled) {
-                    playSound('click');
+                    playSound('tap');
                 }
+            });
+            btn.addEventListener('click', () => {
+                if (!btn.disabled) {
+                    playSound('toggle');
+                }
+            });
+        });
+
+        // Add sound effects to form submissions
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', () => {
+                playSound('success');
+            });
+        });
+
+        // Add sound effects to inputs
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', () => {
+                playSound('tap');
             });
         });
 
