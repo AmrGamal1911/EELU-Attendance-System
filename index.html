@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance System | EELU</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
@@ -40,21 +40,28 @@
     
     <style>
         :root {
-            --primary: #667eea;
-            --primary-dark: #5a6fd8;
-            --secondary: #764ba2;
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --secondary: #7c3aed;
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
             --info: #3b82f6;
             --dark: #1f2937;
             --light: #f8fafc;
-            --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --gradient-light: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            --border-radius: 12px;
-            --border-radius-lg: 16px;
+            --gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            --gradient-light: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%);
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --border-radius: 16px;
+            --border-radius-lg: 20px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --font-primary: 'Poppins', 'Inter', system-ui, -apple-system, sans-serif;
+            --font-secondary: 'Inter', system-ui, -apple-system, sans-serif;
+            --text-primary: #1f2937;
+            --text-secondary: #4b5563;
+            --text-muted: #6b7280;
+            --text-light: #9ca3af;
         }
         
         * {
@@ -64,24 +71,27 @@
         }
         
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--light);
+            font-family: var(--font-secondary);
+            color: var(--text-primary);
             line-height: 1.6;
-            color: var(--dark);
             overflow-x: hidden;
-            background-image: radial-gradient(circle at 10% 20%, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 90%);
+            background: var(--light);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(79, 70, 229, 0.05) 0%, rgba(124, 58, 237, 0.05) 90%),
+                linear-gradient(to bottom right, rgba(79, 70, 229, 0.02) 0%, rgba(124, 58, 237, 0.02) 100%);
         }
         
         .container {
-            max-width: 1000px;
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 2.5rem;
         }
         
         header {
             text-align: center;
-            margin-bottom: 3rem;
+            margin-bottom: 4rem;
             position: relative;
+            animation: slideDown 0.8s ease-out;
         }
         
         header::after {
@@ -90,42 +100,52 @@
             bottom: -20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 60px;
+            width: 80px;
             height: 4px;
             background: var(--gradient);
             border-radius: 2px;
-            animation: slideIn 0.8s ease-out;
+            animation: shimmer 2s infinite linear;
+            background-size: 1000px 100%;
         }
         
         header h1 {
-            font-size: 2.5rem;
+            font-size: 3rem;
             font-weight: 700;
             background: var(--gradient);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 0.5rem;
-            animation: slideDown 0.8s ease-out;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+            font-family: var(--font-primary);
         }
         
         header p {
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             color: #6b7280;
             font-weight: 400;
-            animation: slideDown 0.8s ease-out 0.2s both;
+            max-width: 600px;
+            margin: 0 auto;
         }
         
         .card {
             background: white;
             border-radius: var(--border-radius-lg);
-            padding: 2rem;
+            padding: 2.5rem;
             margin-bottom: 2rem;
-            box-shadow: var(--shadow);
+            box-shadow: var(--shadow-lg);
             border: 1px solid rgba(255, 255, 255, 0.2);
             position: relative;
             overflow: hidden;
-            transition: all 0.3s ease;
+            transition: var(--transition);
             animation: slideUp 0.6s ease-out;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg), 0 30px 60px -15px rgba(79, 70, 229, 0.1);
         }
         
         .card::before {
@@ -146,39 +166,70 @@
         }
         
         .card h2 {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: 600;
-            color: var(--dark);
+            color: var(--text-primary);
             margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
             gap: 0.75rem;
+            font-family: var(--font-primary);
         }
         
         .card h2 i {
             color: var(--primary);
-            font-size: 1.2rem;
+            font-size: 1.5rem;
+            background: var(--gradient-light);
+            padding: 0.75rem;
+            border-radius: 12px;
+            transition: var(--transition);
+        }
+        
+        .card:hover h2 i {
+            transform: scale(1.1);
+            background: var(--gradient);
+            color: white;
         }
         
         .btn {
             background: var(--gradient);
             color: white;
-            padding: 0.875rem 1.75rem;
+            padding: 1rem 2rem;
             border-radius: var(--border-radius);
             border: none;
             cursor: pointer;
             font-size: 1rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
+            font-weight: 600;
+            transition: var(--transition);
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            position: relative;
+            overflow: hidden;
+            font-family: var(--font-primary);
+            letter-spacing: 0.01em;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.5s ease;
         }
         
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+            box-shadow: var(--shadow);
+        }
+        
+        .btn:hover::before {
+            transform: translateX(100%);
         }
         
         .btn:disabled {
@@ -201,34 +252,55 @@
         
         .form-group {
             margin-bottom: 1.5rem;
+            animation: slideUp 0.5s ease-out forwards;
+            opacity: 0;
         }
+        
+        .form-group:nth-child(1) { animation-delay: 0.1s; }
+        .form-group:nth-child(2) { animation-delay: 0.2s; }
+        .form-group:nth-child(3) { animation-delay: 0.3s; }
         
         label {
             display: block;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
             font-weight: 500;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            color: var(--dark);
         }
         
         label i {
             color: var(--primary);
-            width: 16px;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         input {
             width: 100%;
-            padding: 0.875rem 1rem;
+            padding: 1rem 1.25rem;
             border: 2px solid #e5e7eb;
             border-radius: var(--border-radius);
             font-size: 1rem;
-            transition: all 0.3s ease;
+            transition: var(--transition);
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            font-family: var(--font-secondary);
+            color: var(--text-primary);
+        }
+        
+        input:hover {
+            border-color: var(--primary-dark);
+            box-shadow: 0 2px 4px rgba(79, 70, 229, 0.1);
         }
         
         input:focus {
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
             outline: none;
         }
         
@@ -238,206 +310,113 @@
             text-align: center;
             border-radius: var(--border-radius-lg);
             margin-bottom: 1.5rem;
-            transition: all 0.3s ease;
+            transition: var(--transition);
             background: var(--gradient-light);
+            cursor: pointer;
         }
         
         .file-upload:hover {
             border-color: var(--primary);
-            background: rgba(102, 126, 234, 0.05);
+            background: rgba(79, 70, 229, 0.05);
+            transform: translateY(-2px);
         }
         
-        #fileName {
-            color: #6b7280;
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
+        .file-upload i {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            transition: var(--transition);
         }
         
-        #qrcode {
-            padding: 1.5rem;
-            background: white;
-            border-radius: var(--border-radius);
-            display: inline-block;
-            border: 1px solid #f3f4f6;
-            margin: 1rem 0;
-            box-shadow: var(--shadow);
-            animation: scaleIn 0.5s ease-out;
+        .file-upload:hover i {
+            transform: scale(1.1);
         }
         
-        .session-url {
-            margin: 1.5rem 0;
+        @media (max-width: 768px) {
+            .container {
+                padding: 1.5rem;
+            }
+            
+            header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .card {
+                padding: 1.75rem;
+            }
+            
+            .card h2 {
+                font-size: 1.5rem;
+            }
+            
+            .btn {
+                padding: 0.875rem 1.5rem;
+            }
         }
         
-        .session-url .input-group {
-            display: flex;
-            gap: 0.5rem;
+        @media (max-width: 480px) {
+            header h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+            
+            .file-upload {
+                padding: 2rem 1.5rem;
+            }
         }
         
-        .session-url input {
-            flex: 1;
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
         }
         
-        .copy-btn {
-            padding: 0.875rem;
-            min-width: auto;
+        @keyframes slideDown {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
         
-        .alert {
-            padding: 1rem 1.5rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 1.5rem;
-            border-left: 4px solid;
-            font-weight: 500;
-            animation: slideInRight 0.5s ease-out;
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
         
-        .alert-success {
-            background: rgba(16, 185, 129, 0.1);
-            color: #047857;
-            border-left-color: var(--success);
+        @keyframes fadeScale {
+            from {
+                transform: scale(0.95);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
         
-        .alert-danger {
-            background: rgba(239, 68, 68, 0.1);
-            color: #b91c1c;
-            border-left-color: var(--danger);
-        }
-        
-        .session-status {
-            text-align: center;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 2rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1rem;
-        }
-        
-        .session-active {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
-            color: #047857;
-            border: 2px solid rgba(16, 185, 129, 0.2);
-        }
-        
-        .session-inactive {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
-            color: #b91c1c;
-            border: 2px solid rgba(239, 68, 68, 0.2);
-        }
-        
-        .sync-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-            padding: 0.5rem 1rem;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 50px;
-        }
-        
-        .sync-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #d1d5db;
-            transition: all 0.3s ease;
-        }
-        
-        .sync-indicator.connected {
-            background: var(--success);
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
-        }
-        
-        .sync-indicator.connecting {
-            background: var(--warning);
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.1); }
-        }
-        
-        #rosterInfo {
-            margin-top: 1.5rem;
-            padding: 1.5rem;
-            background: var(--gradient-light);
-            border-radius: var(--border-radius);
-            border: 1px solid rgba(102, 126, 234, 0.2);
-        }
-        
-        .attendance-list {
-            max-height: 400px;
-            overflow-y: auto;
-            margin-top: 1rem;
-            border-radius: var(--border-radius);
-            background: #f8fafc;
-            border: 1px solid #e5e7eb;
-        }
-        
-        .attendee-item {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid #f1f5f9;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            animation: slideInUp 0.5s ease-out;
-        }
-        
-        .attendee-item:last-child {
-            border-bottom: none;
-        }
-        
-        .attendee-info {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-        
-        .attendee-name {
-            font-weight: 600;
-            color: var(--dark);
-        }
-        
-        .attendee-details {
-            font-size: 0.875rem;
-            color: #6b7280;
-        }
-        
-        .attendee-time {
-            text-align: right;
-            font-size: 0.875rem;
-            color: #6b7280;
-        }
-        
-        .progress-container {
-            margin: 1.5rem 0;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #f1f5f9;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 0.5rem;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: var(--gradient);
-            transition: width 0.5s ease;
-            border-radius: 4px;
-        }
-        
-        .progress-text {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.875rem;
-            color: #6b7280;
-            font-weight: 500;
+        @keyframes shimmer {
+            0% {
+                background-position: -1000px 0;
+            }
+            100% {
+                background-position: 1000px 0;
+            }
         }
         
         .hidden {
@@ -1038,7 +1017,454 @@
             background-size: 1.5em;
             padding-right: 2.5rem;
         }
+
+        /* Enhanced Loading Animations */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        @keyframes rotate3D {
+            0% { transform: perspective(1000px) rotateY(0deg); }
+            100% { transform: perspective(1000px) rotateY(360deg); }
+        }
+
+        @keyframes wave {
+            0%, 100% { transform: translateY(0); }
+            20% { transform: translateY(-10px); }
+            40% { transform: translateY(0); }
+            60% { transform: translateY(-5px); }
+            80% { transform: translateY(0); }
+        }
+
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .loading-icon {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-icon i {
+            font-size: 3rem;
+            color: var(--primary);
+            animation: bounce 2s infinite ease-in-out;
+        }
+
+        .loading-icon::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            width: 40%;
+            height: 4px;
+            background: rgba(79, 70, 229, 0.2);
+            border-radius: 50%;
+            filter: blur(3px);
+            animation: shadow-pulse 2s infinite ease-in-out;
+        }
+
+        @keyframes shadow-pulse {
+            0%, 100% { transform: scaleX(1); opacity: 0.3; }
+            50% { transform: scaleX(0.7); opacity: 0.1; }
+        }
+
+        .loading-text {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .loading-text span {
+            display: inline-block;
+            animation: wave 1.5s infinite;
+        }
+
+        .loading-text span:nth-child(2) { animation-delay: 0.1s; }
+        .loading-text span:nth-child(3) { animation-delay: 0.2s; }
+        .loading-text span:nth-child(4) { animation-delay: 0.3s; }
+
+        /* Adjusted Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 1.5rem;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            max-width: 600px;
+            width: 95%;
+            position: relative;
+            transform: scale(0.95) translateY(10px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            padding-bottom: 1.25rem;
+            border-bottom: 2px solid rgba(79, 70, 229, 0.1);
+        }
+
+        .modal-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .modal-title i {
+            font-size: 1.5rem;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            padding: 0.75rem;
+            border-radius: 12px;
+            background-color: rgba(79, 70, 229, 0.1);
+        }
+
+        .qr-container {
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(124, 58, 237, 0.08) 100%);
+            padding: 2.5rem;
+            border-radius: 20px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            position: relative;
+            border: 1px solid rgba(79, 70, 229, 0.15);
+        }
+
+        .qr-container p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            text-align: center;
+            max-width: 80%;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        #locationQRCode {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px -5px rgba(79, 70, 229, 0.2);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            margin: 0.5rem 0;
+            border: 1px solid rgba(79, 70, 229, 0.1);
+        }
+
+        #locationQRCode:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px -5px rgba(79, 70, 229, 0.3);
+        }
+
+        #locationQRCode img {
+            display: block;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            border-radius: 12px;
+        }
+
+        #locationStatus {
+            width: 100%;
+            padding: 1.5rem;
+            border-radius: 16px;
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            margin-top: 0;
+        }
+
+        #locationPreview {
+            color: var(--primary);
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        #locationPreview i {
+            color: var(--info);
+            font-size: 1.25rem;
+        }
+
+        .location-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--primary);
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin: 1.5rem auto 0.5rem;
+        }
+
+        #locationNameForm {
+            width: 100%;
+            margin-top: 0.5rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.08) 100%);
+            border-radius: 16px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        #locationNameForm .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        #locationNameForm label {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--success);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        #locationNameForm label i {
+            color: var(--success);
+            font-size: 1.25rem;
+        }
+
+        #locationNameForm input {
+            width: 100%;
+            padding: 1rem 1.25rem;
+            border: 2px solid rgba(16, 185, 129, 0.2);
+            border-radius: 12px;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        #locationNameForm input:focus {
+            outline: none;
+            border-color: var(--success);
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+        }
+
+        #locationNameForm .btn-success {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+            border-radius: 12px;
+            background: var(--gradient-success) !important;
+            border: none;
+            color: white;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        #locationNameForm .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.3);
+        }
+
+        #locationNameForm .btn-success i {
+            font-size: 1.25rem;
+        }
+
+        @media (max-width: 640px) {
+            .modal-content {
+                padding: 1.5rem;
+                border-radius: 20px;
+                width: 100%;
+            }
+
+            .modal-title {
+                font-size: 1.5rem;
+            }
+
+            .qr-container {
+                padding: 1.5rem;
+                gap: 1.5rem;
+            }
+
+            .qr-container p {
+                font-size: 1rem;
+                max-width: 100%;
+            }
+
+            #locationQRCode {
+                padding: 1.5rem;
+            }
+
+            #locationQRCode img {
+                width: 180px;
+                height: 180px;
+            }
+
+            #locationStatus {
+                padding: 1.25rem;
+            }
+
+            #locationPreview {
+                font-size: 1rem;
+            }
+
+            #locationNameForm {
+                padding: 1.5rem;
+            }
+
+            #locationNameForm label {
+                font-size: 1rem;
+            }
+
+            #locationNameForm input {
+                padding: 0.875rem 1rem;
+                font-size: 1rem;
+            }
+
+            #locationNameForm .btn-success {
+                padding: 0.875rem;
+                font-size: 1rem;
+            }
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: white;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transform: translateX(200%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast i {
+            font-size: 1.2rem;
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.success i {
+            color: var(--success);
+        }
+
+        /* Smooth Scroll Animation */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+        }
     </style>
+
+    <audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3" preload="auto"></audio>
+    <audio id="errorSound" src="https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3" preload="auto"></audio>
+    <audio id="clickSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
+
+    <script>
+        // Add sound effects
+        const sounds = {
+            success: document.getElementById('successSound'),
+            error: document.getElementById('errorSound'),
+            click: document.getElementById('clickSound')
+        };
+
+        function playSound(type) {
+            try {
+                if (sounds[type]) {
+                    sounds[type].currentTime = 0;
+                    sounds[type].play();
+                }
+            } catch (error) {
+                console.warn('Sound playback failed:', error);
+            }
+        }
+
+        // Add hover sound effects to buttons
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                if (!btn.disabled) {
+                    playSound('click');
+                }
+            });
+        });
+
+        // Add success/error sounds to appropriate actions
+        function showSuccess(message) {
+            playSound('success');
+            // ... existing success handling ...
+        }
+
+        function showError(message) {
+            playSound('error');
+            // ... existing error handling ...
+        }
+
+        // ... rest of your existing JavaScript ...
+    </script>
 </head>
 <body>
     <div class="container">
@@ -1113,7 +1539,7 @@
                             <span class="toggle-slider"></span>
                         </label>
                         <button type="button" id="setLocationBtn" class="btn btn-secondary location-btn" style="display: none;">
-                            <i class="fas fa-qrcode"></i> Scan QR for Location
+                            <i class="fas fa-qrcode"></i> Scan QR for new Location
                         </button>
                     </label>
                     <div id="locationSettings" class="hidden">
@@ -1165,32 +1591,45 @@
     <!-- Location Picker Modal -->
     <div id="locationQRModal" class="modal hidden">
         <div class="modal-content">
-            <h2><i class="fas fa-qrcode"></i> Set Class Location</h2>
-            <p class="text-center mb-4">Scan this QR code with your mobile device to set the class location</p>
-            
-            <div id="locationQRCode" class="text-center"></div>
-            
-            <div id="locationStatus" class="alert alert-info mt-4">
-                <div id="locationPreview">Waiting for location from mobile device...</div>
-                <div class="spinner mt-2"></div>
-            </div>
-
-            <div id="locationNameForm" class="hidden">
-            <div class="form-group">
-                    <label for="locationName">Location Name:</label>
-                    <input type="text" id="locationName" placeholder="e.g., Room 101" required>
-            </div>
-                <button onclick="attendanceApp.saveLocation()" class="btn btn-success">
-                    <i class="fas fa-save"></i> Save Location
-                </button>
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-map-marker-alt"></i>
+                    Set Class Location
+                </h3>
             </div>
             
-            <div class="flex gap-4 mt-4">
-                <button onclick="attendanceApp.closeLocationModal()" class="btn btn-danger">
-                    <i class="fas fa-times"></i> Cancel
-                </button>
+            <div class="qr-container">
+                <p class="text-center">Scan this QR code with your mobile device to set the class location</p>
+                <div id="locationQRCode"></div>
+                
+                <div id="locationStatus" class="alert alert-info">
+                    <div id="locationPreview">
+                        <i class="fas fa-location-crosshairs"></i>
+                        Waiting for location from mobile device...
+                    </div>
+                    <div class="location-spinner"></div>
+                </div>
+                
+                <div id="locationNameForm" class="hidden">
+                    <div class="form-group">
+                        <label for="locationName">
+                            <i class="fas fa-tag"></i>
+                            Location Name:
+                        </label>
+                        <input type="text" id="locationName" placeholder="e.g., Room 101" required>
+                    </div>
+                    <button onclick="attendanceApp.saveLocation()" class="btn btn-success">
+                        <i class="fas fa-save"></i>
+                        Save Location
+                    </button>
+                </div>
             </div>
         </div>
+    </div>
+
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span>URL copied to clipboard!</span>
     </div>
 
     <!-- Voice Command Button -->
@@ -1950,9 +2389,9 @@
                 try {
                     // First try to get session from current sessions
                     let session = this.currentSessions.find(s => s.id === sessionId);
-                    
+                
                     // If not found in current sessions, try to get from history
-                    if (!session) {
+                if (!session) {
                         const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
                         const historySession = history.find(s => s.id === sessionId);
                         
@@ -1975,20 +2414,20 @@
 
                     if (!session) {
                         this.showMessage('Session data not found', 'danger');
-                        return;
-                    }
-
-                    const roster = session.roster || [];
+                    return;
+                }
+                
+                const roster = session.roster || [];
                     const attendees = Object.values(session.attendees || {});
-                    const currentWeek = parseInt(session.week);
-                    const subjectName = session.subject;
+                const currentWeek = parseInt(session.week);
+                const subjectName = session.subject;
                     const allWeeks = [...(session.existingWeeks || []), currentWeek]
                         .filter((v, i, a) => a.indexOf(v) === i)
                         .sort((a, b) => a - b);
-
+                
                     // IP flags
-                    const ipMap = {};
-                    attendees.forEach(a => {
+                const ipMap = {};
+                attendees.forEach(a => {
                         if (!a.deviceInfo?.ip) return;
                         if (!ipMap[a.deviceInfo.ip]) ipMap[a.deviceInfo.ip] = [];
                         ipMap[a.deviceInfo.ip].push(a.id);
@@ -2005,51 +2444,51 @@
 
                     // Final report data
                     const reportData = [];
-                    
-                    if (session.existingWeeks?.length > 0) {
+                
+                if (session.existingWeeks?.length > 0) {
                         roster.forEach(student => {
-                            const matched = attendees.find(a => a.id === student.id);
+                        const matched = attendees.find(a => a.id === student.id);
                             const row = {
-                                'Student ID': student.id,
-                                'Name': student.name,
-                                'Section': student.section || ''
-                            };
-                            
-                            allWeeks.forEach(week => {
-                                if (week === currentWeek) {
+                            'Student ID': student.id,
+                            'Name': student.name,
+                            'Section': student.section || ''
+                        };
+                        
+                        allWeeks.forEach(week => {
+                            if (week === currentWeek) {
                                     row[`Week ${week}`] = matched ? 1 : 0;
                                     row[`Timestamp Week ${week}`] = matched ? 
-                                        new Date(matched.timestamp).toLocaleString() : 'N/A';
-                                } else {
+                                    new Date(matched.timestamp).toLocaleString() : 'N/A';
+                            } else {
                                     row[`Week ${week}`] = student.weekData?.[week] || 0;
                                     row[`Timestamp Week ${week}`] = student[`Timestamp Week ${week}`] || 'N/A';
-                                }
-                            });
-                            
+                            }
+                        });
+                        
                             row['Total Attendance'] = allWeeks.reduce((sum, week) => {
                                 return sum + (Number(row[`Week ${week}`]) || 0);
-                            }, 0);
+                        }, 0);
 
-                            // Add IP note if applicable
+                        // Add IP note if applicable
                             const ipNote = ipNotes[student.id] || '';
                             row['Note'] = ipNote;
                             
                             reportData.push(row);
-                        });
-                    } else {
+                    });
+                } else {
                         roster.forEach(student => {
-                            const matched = attendees.find(a => a.id === student.id);
-                            const row = {
-                                'Student ID': student.id,
-                                'Name': student.name,
-                                'Section': student.section || '',
+                        const matched = attendees.find(a => a.id === student.id);
+                        const row = {
+                            'Student ID': student.id,
+                            'Name': student.name,
+                            'Section': student.section || '',
                                 [`Week ${currentWeek}`]: matched ? 1 : 0,
                                 'Total Attendance': matched ? 1 : 0,
-                                [`Timestamp Week ${currentWeek}`]: matched ? 
-                                    new Date(matched.timestamp).toLocaleString() : 'N/A'
-                            };
+                            [`Timestamp Week ${currentWeek}`]: matched ? 
+                                new Date(matched.timestamp).toLocaleString() : 'N/A'
+                        };
 
-                            // Add IP note if applicable
+                        // Add IP note if applicable
                             const ipNote = ipNotes[student.id] || '';
                             row['Note'] = ipNote;
                             
@@ -2071,48 +2510,48 @@
                             });
                         }
                     });
-                    
-                    const columnOrder = ['Student ID', 'Name', 'Section'];
-                    
-                    allWeeks.forEach(week => {
-                        columnOrder.push(`Week ${week}`);
-                    });
-                    
-                    columnOrder.push('Total Attendance');
-                    
-                    allWeeks.forEach(week => {
-                        columnOrder.push(`Timestamp Week ${week}`);
-                    });
+                
+                const columnOrder = ['Student ID', 'Name', 'Section'];
+                
+                allWeeks.forEach(week => {
+                    columnOrder.push(`Week ${week}`);
+                });
+                
+                columnOrder.push('Total Attendance');
+                
+                allWeeks.forEach(week => {
+                    columnOrder.push(`Timestamp Week ${week}`);
+                });
 
-                    // Add Note and Flagged columns
-                    columnOrder.push('Note');
-                    
-                    const reorderedData = reportData.map(row => {
-                        const newRow = {};
-                        columnOrder.forEach(col => {
-                            if (row[col] !== undefined) {
-                                newRow[col] = row[col];
-                            }
-                        });
-                        return newRow;
+                // Add Note and Flagged columns
+                columnOrder.push('Note');
+                
+                const reorderedData = reportData.map(row => {
+                    const newRow = {};
+                    columnOrder.forEach(col => {
+                        if (row[col] !== undefined) {
+                            newRow[col] = row[col];
+                        }
                     });
-                    
-                    const ws = XLSX.utils.json_to_sheet(reorderedData);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-                    
-                    const today = new Date();
-                    const dateStr = today.toISOString().split('T')[0];
-                    let fileName;
-                    
-                    if (allWeeks.length > 1) {
-                        fileName = `${subjectName} Attendance from Week ${Math.min(...allWeeks)} to ${Math.max(...allWeeks)} ${dateStr}.xlsx`;
-                    } else {
-                        fileName = `${subjectName} Attendance for Week ${currentWeek} ${dateStr}.xlsx`;
-                    }
-                    
-                    fileName = fileName.replace(/[^a-zA-Z0-9\s\.\-_]/g, '').replace(/\s+/g, ' ');
-                    XLSX.writeFile(wb, fileName);
+                    return newRow;
+                });
+                
+                const ws = XLSX.utils.json_to_sheet(reorderedData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+                
+                const today = new Date();
+                const dateStr = today.toISOString().split('T')[0];
+                let fileName;
+                
+                if (allWeeks.length > 1) {
+                    fileName = `${subjectName} Attendance from Week ${Math.min(...allWeeks)} to ${Math.max(...allWeeks)} ${dateStr}.xlsx`;
+                } else {
+                    fileName = `${subjectName} Attendance for Week ${currentWeek} ${dateStr}.xlsx`;
+                }
+                
+                fileName = fileName.replace(/[^a-zA-Z0-9\s\.\-_]/g, '').replace(/\s+/g, ' ');
+                XLSX.writeFile(wb, fileName);
                 } catch (error) {
                     console.error('Error exporting attendance report:', error);
                     this.showMessage('Failed to export attendance report: ' + error.message, 'danger');
@@ -2498,6 +2937,12 @@
             openLocationModal: function() {
                 const modal = document.getElementById('locationQRModal');
                 const qrContainer = document.getElementById('locationQRCode');
+                
+                if (!modal || !qrContainer) {
+                    console.error('Modal elements not found');
+                    return;
+                }
+
                 const sessionId = Date.now().toString();
                 const locationUrl = `${window.location.origin}/location.html?session=${sessionId}`;
                 
@@ -2505,15 +2950,23 @@
                 const qr = qrcode(0, 'L');
                 qr.addData(locationUrl);
                 qr.make();
+                
+                // Update QR code with improved styling
                 qrContainer.innerHTML = qr.createImgTag(10);
+                const qrImg = qrContainer.querySelector('img');
+                if (qrImg) {
+                    qrImg.style.margin = 'auto';
+                    qrImg.style.display = 'block';
+                }
                 
                 // Reset form state
                 document.getElementById('locationNameForm').classList.add('hidden');
                 document.getElementById('locationPreview').textContent = 'Waiting for location from mobile device...';
-                document.querySelector('#locationStatus .spinner').style.display = 'block';
+                document.querySelector('#locationStatus .location-spinner').style.display = 'block';
                 
-                // Show modal
+                // Show modal with animation
                 modal.classList.remove('hidden');
+                modal.classList.add('active');
                 
                 // Listen for location updates from Firebase
                 const locationRef = window.dbRef(window.database, `temp-locations/${sessionId}`);
@@ -2527,24 +2980,26 @@
                             accuracy: locationData.accuracy
                         };
                         
-                        // Update location preview
-                        document.getElementById('locationPreview').style.display = 'block';
-                        document.getElementById('locationPreview').textContent = 
-                            `Location coordinates: (${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)})`;
+                        // Update location preview with improved styling
+                        const preview = document.getElementById('locationPreview');
+                        preview.innerHTML = `
+                            <i class="fas fa-map-marker-alt"></i>
+                            Location coordinates: (${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)})
+                        `;
                         
-                        // Hide waiting message
-                        document.getElementById('locationStatus').style.display = 'none';
+                        // Hide spinner
+                        document.querySelector('#locationStatus .location-spinner').style.display = 'none';
                         
-                        // Show location name form
-                        document.getElementById('locationNameForm').classList.remove('hidden');
+                        // Show location name form with animation
+                        const nameForm = document.getElementById('locationNameForm');
+                        nameForm.classList.remove('hidden');
+                        nameForm.style.animation = 'slideIn 0.3s ease-out';
                         
                         // Show success message
-                        this.showMessage('Location set successfully!', 'success');
+                        this.showMessage('Location received successfully!', 'success');
                         
-                        // Clean up the temporary location data
+                        // Clean up
                         window.dbSet(locationRef, null);
-                        
-                        // Remove the listener
                         window.dbOff(locationRef);
                     }
                 });
@@ -2590,8 +3045,12 @@
 
             closeLocationModal: function() {
                 const modal = document.getElementById('locationQRModal');
-                modal.classList.add('hidden');
-                window.removeEventListener('message', this.handleLocationMessage);
+                if (modal) {
+                    modal.classList.remove('active');
+                    setTimeout(() => {
+                        modal.classList.add('hidden');
+                    }, 300);
+                }
             },
 
             updateSubjectName: function() {
@@ -2920,6 +3379,88 @@
         });
 
         window.app = attendanceApp;
+
+        function showQRLoading(show) {
+            const loading = document.getElementById('qrLoading');
+            const qrcode = document.getElementById('qrcode');
+            
+            if (!loading || !qrcode) return;
+            
+            if (show) {
+                loading.style.display = 'flex';
+                qrcode.style.display = 'none';
+            } else {
+                loading.style.display = 'none';
+                qrcode.style.display = 'block';
+            }
+        }
+
+        // Add event listeners for modal close
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('locationQRModal');
+            const closeBtn = modal?.querySelector('.modal-close');
+            
+            // Close on clicking outside
+            if (modal) {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        attendanceApp.closeLocationModal();
+                    }
+                });
+            }
+            
+            // Close on close button click
+            if (closeBtn) {
+                closeBtn.addEventListener('click', attendanceApp.closeLocationModal);
+            }
+            
+            // Prevent modal close when clicking modal content
+            const modalContent = modal?.querySelector('.modal-content');
+            if (modalContent) {
+                modalContent.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+            }
+        });
+
+        // Update the modal structure
+        document.getElementById('locationQRModal').innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-map-marker-alt"></i>
+                        Set Class Location
+                    </h3>
+                </div>
+                
+                <div class="qr-container">
+                    <p class="text-center">Scan this QR code with your mobile device to set the class location</p>
+                    <div id="locationQRCode"></div>
+                    
+                    <div id="locationStatus" class="alert alert-info">
+                        <div id="locationPreview">
+                            <i class="fas fa-location-crosshairs"></i>
+                            Waiting for location from mobile device...
+                        </div>
+                        <div class="location-spinner"></div>
+                    </div>
+                    
+                    <div id="locationNameForm" class="hidden">
+                        <div class="form-group">
+                            <label for="locationName">
+                                <i class="fas fa-tag"></i>
+                                Location Name:
+                            </label>
+                            <input type="text" id="locationName" placeholder="e.g., Room 101" required>
+                        </div>
+                        <button onclick="attendanceApp.saveLocation()" class="btn btn-success">
+                            <i class="fas fa-save"></i>
+                            Save Location
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
     </script>
 </body>
 </html>
