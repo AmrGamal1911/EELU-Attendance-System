@@ -4631,6 +4631,54 @@
                     }).join('');
                 
                 historyList.innerHTML = historyHtml;
+            },
+
+            updateSession: async function(sessionId) {
+                const updateBtn = document.getElementById(`updateBtn_${sessionId}`);
+                if (!updateBtn) return;
+
+                try {
+                    updateBtn.disabled = true;
+                    updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                    // Get session data
+                    const sessionRef = window.dbRef(window.database, `sessions/${sessionId}`);
+                    const sessionSnapshot = await window.dbGet(sessionRef);
+                    if (!sessionSnapshot.exists()) {
+                        showToast('error', 'Error', '');
+                        return;
+                    }
+
+                    const sessionData = sessionSnapshot.val();
+                    
+                    // Update session in Firebase
+                    await window.dbSet(sessionRef, {
+                        ...sessionData,
+                        updatedAt: Date.now()
+                    });
+
+                    // Update local storage
+                    const sessions = JSON.parse(localStorage.getItem('sessions') || '{}');
+                    sessions[sessionId] = sessionData;
+                    localStorage.setItem('sessions', JSON.stringify(sessions));
+
+                    // Show success feedback
+                    updateBtn.innerHTML = '<i class="fas fa-check"></i>';
+                    updateBtn.classList.add('success');
+                    showToast('success', 'Success', '');
+
+                    setTimeout(() => {
+                        updateBtn.disabled = false;
+                        updateBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                        updateBtn.classList.remove('success');
+                    }, 2000);
+
+                } catch (error) {
+                    console.error('Error updating session:', error);
+                    updateBtn.disabled = false;
+                    updateBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                    showToast('error', 'Error', '');
+                }
             }
         };
 
@@ -5044,35 +5092,50 @@
         }
 
         function showToast(type, title, message) {
-            const toast = document.getElementById('toast');
-            const icon = toast.querySelector('i');
-            const strong = toast.querySelector('strong');
-            const p = toast.querySelector('p');
+    const toast = document.getElementById('toast');
+    const icon = toast.querySelector('i');
+    const strong = toast.querySelector('strong');
+    const p = toast.querySelector('p');
 
-            // Reset classes
-            toast.className = 'toast';
-            icon.className = 'fas';
+    // Reset classes
+    toast.className = 'toast';
+    icon.className = 'fas';
 
-            // Set content
-            if (type === 'success') {
-                toast.classList.add('success');
-                icon.classList.add('fa-check-circle');
-            } else {
-                toast.classList.add('error');
-                icon.classList.add('fa-exclamation-circle');
-            }
+    // Set content and style based on type
+    switch(type) {
+        case 'success':
+            toast.classList.add('success');
+            icon.classList.add('fa-check-circle');
+            title = 'Success';
+            break;
+        case 'error':
+            toast.classList.add('error');
+            icon.classList.add('fa-exclamation-circle');
+            title = 'Error';
+            break;
+        case 'warning':
+            toast.classList.add('warning');
+            icon.classList.add('fa-exclamation-triangle');
+            title = 'Warning';
+            break;
+        case 'info':
+            toast.classList.add('info');
+            icon.classList.add('fa-info-circle');
+            title = 'Info';
+            break;
+    }
 
-            strong.textContent = title;
-            p.textContent = message;
+    strong.textContent = title;
+    p.textContent = message || '';
 
-            // Show toast
-            toast.classList.add('show');
+    // Show toast with animation
+    toast.classList.add('show');
 
-            // Hide after 3 seconds
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
-        }
+    // Hide after 3 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3000);
+}
 
         function showButtonFeedback(button, type) {
             // Remove any existing feedback classes
