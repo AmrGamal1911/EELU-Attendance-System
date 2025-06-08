@@ -645,15 +645,18 @@
             top: 2rem;
             right: 2rem;
             padding: 1rem 1.5rem;
-            border-radius: 8px;
+            border-radius: var(--border-radius);
             background: white;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--shadow-lg);
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 1rem;
             transform: translateX(150%);
             transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
             z-index: 1000;
+            max-width: 400px;
+            width: calc(100% - 4rem);
+            border-left: 4px solid;
         }
 
         .toast.show {
@@ -662,10 +665,29 @@
 
         .toast i {
             font-size: 1.5rem;
+            flex-shrink: 0;
+            margin-top: 0.125rem;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-content strong {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-family: var(--font-primary);
+        }
+
+        .toast-content p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.4;
         }
 
         .toast.success {
-            border-left: 4px solid var(--success);
+            border-left-color: var(--success);
+            background: rgba(16, 185, 129, 0.05);
         }
 
         .toast.success i {
@@ -673,45 +695,190 @@
         }
 
         .toast.error {
-            border-left: 4px solid var(--danger);
+            border-left-color: var(--danger);
+            background: rgba(239, 68, 68, 0.05);
         }
 
         .toast.error i {
             color: var(--danger);
         }
 
-        .pulse {
-            animation: pulse 2s infinite;
+        .toast.warning {
+            border-left-color: var(--warning);
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .toast.warning i {
+            color: var(--warning);
+        }
+
+        .toast.info {
+            border-left-color: var(--info);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .toast.info i {
+            color: var(--info);
+        }
+
+        @media (max-width: 480px) {
+            .toast {
+                top: auto;
+                bottom: 2rem;
+                left: 1rem;
+                right: 1rem;
+                width: calc(100% - 2rem);
+                max-width: none;
+            }
+        }
+
+        .input-group {
+            position: relative;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .btn-voice {
+            background: var(--gradient-light);
+            color: var(--primary);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            border: 1px solid rgba(79, 70, 229, 0.1);
+            cursor: pointer;
+            transition: var(--transition);
+            flex-shrink: 0;
+            width: auto;
+        }
+
+        .btn-voice:hover {
+            background: var(--gradient);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .btn-voice.listening {
+            animation: pulse 1.5s infinite;
+            background: var(--gradient);
+            color: white;
+        }
+
+        .voice-help {
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            background: var(--gradient-light);
+            color: var(--primary);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+
+        .voice-help.show {
+            opacity: 1;
+            transform: translateY(0);
         }
 
         @keyframes pulse {
             0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            50% { transform: scale(1.05); box-shadow: var(--shadow); }
             100% { transform: scale(1); }
         }
 
-        .shake {
-            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        /* Voice command modal */
+        .voice-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-lg);
+            max-width: 90%;
+            width: 400px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
         }
 
-        @keyframes shake {
-            10%, 90% { transform: translate3d(-1px, 0, 0); }
-            20%, 80% { transform: translate3d(2px, 0, 0); }
-            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-            40%, 60% { transform: translate3d(4px, 0, 0); }
+        .voice-modal.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+            visibility: visible;
         }
 
-        /* Button success and error states */
-        .btn.success {
-            background: var(--success);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);
+        .voice-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 999;
         }
 
-        .btn.error {
-            background: var(--danger);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1);
+        .voice-modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .voice-modal-content {
+            text-align: center;
+        }
+
+        .voice-modal-icon {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .voice-modal-title {
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            font-family: var(--font-primary);
+        }
+
+        .voice-modal-subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        .voice-waves {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.25rem;
+            margin: 1.5rem 0;
+            height: 60px;
+        }
+
+        .voice-wave {
+            width: 4px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+        }
+
+        .voice-wave:nth-child(2) { animation-delay: 0.1s; }
+        .voice-wave:nth-child(3) { animation-delay: 0.2s; }
+        .voice-wave:nth-child(4) { animation-delay: 0.3s; }
+        .voice-wave:nth-child(5) { animation-delay: 0.4s; }
+
+        @keyframes wave {
+            0%, 100% { height: 20px; }
+            50% { height: 40px; }
         }
     </style>
 </head>
@@ -820,8 +987,17 @@
                 <form id="attendanceForm" aria-label="Attendance submission form">
                     <div class="form-group">
                         <label for="student_id"><i class="fas fa-id-card" aria-hidden="true"></i> Student ID</label>
-                        <input type="text" id="student_id" name="student_id" placeholder="Enter your university ID" required 
-                               aria-required="true" autocomplete="off" pattern="[0-9]*" inputmode="numeric">
+                        <div class="input-group">
+                            <input type="text" id="student_id" name="student_id" placeholder="Enter your university ID" required 
+                                   aria-required="true" autocomplete="off" pattern="[0-9]*" inputmode="numeric">
+                            <button type="button" id="voiceInputBtn" class="btn btn-voice" aria-label="Use voice input">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                        </div>
+                        <div id="voiceInputHelp" class="voice-help hidden">
+                            <i class="fas fa-info-circle"></i>
+                            <span>قول رقمك الجامعي بالعربي أو بالعامية</span>
+                        </div>
                     </div>
                     
                     <div id="passwordField" class="form-group hidden">
@@ -867,6 +1043,26 @@
         <div class="toast-content">
             <strong></strong>
             <p></p>
+        </div>
+    </div>
+
+    <!-- Add voice modal -->
+    <div class="voice-modal-overlay" id="voiceModalOverlay"></div>
+    <div class="voice-modal" id="voiceModal">
+        <div class="voice-modal-content">
+            <div class="voice-modal-icon">
+                <i class="fas fa-microphone"></i>
+            </div>
+            <h3 class="voice-modal-title">Voice Recognition</h3>
+            <p class="voice-modal-subtitle">قول رقمك الجامعي بالعربي أو بالعامية</p>
+            <div class="voice-waves">
+                <div class="voice-wave"></div>
+                <div class="voice-wave"></div>
+                <div class="voice-wave"></div>
+                <div class="voice-wave"></div>
+                <div class="voice-wave"></div>
+            </div>
+            <p id="voiceResult" class="voice-result"></p>
         </div>
     </div>
 
@@ -1424,7 +1620,7 @@
                     const currentSession = sessionSnapshot.val();
                     
                     if (!currentSession || !currentSession.active) {
-                        showToast('Session is no longer active', 'error');
+                        showToast('error', 'Session Closed', 'This attendance session is no longer active');
                         showButtonFeedback(submitBtn, 'error');
                         this.showClosedSession();
                         return;
@@ -1438,7 +1634,7 @@
                     const isTA = this.sessionData.taID === studentId || this.currentIP === this.sessionData.taIP;
 
                     if (!student && !isTA) {
-                        showToast('Student ID not found in roster', 'error');
+                        showToast('error', 'Invalid Student ID', 'Your ID was not found in the course roster');
                         showButtonFeedback(submitBtn, 'error');
                         throw new Error('Student ID not found in roster');
                     }
@@ -1451,7 +1647,7 @@
 
                     // Skip password check for TA
                     if (!isTA && this.sessionData.password && password !== this.sessionData.password) {
-                        showToast('Incorrect session password', 'error');
+                        showToast('error', 'Incorrect Password', 'The session password you entered is incorrect');
                         showButtonFeedback(submitBtn, 'error');
                         throw new Error('Incorrect session password');
                     }
@@ -1459,7 +1655,7 @@
                     // Check if student already attended
                     const existingAttendee = Object.values(this.sessionData.attendees || {}).find(a => a.id === studentId);
                     if (existingAttendee) {
-                        showToast('Attendance already recorded for this ID', 'error');
+                        showToast('warning', 'Already Submitted', 'Your attendance has already been recorded for this session');
                         showButtonFeedback(submitBtn, 'error');
                         throw new Error('Attendance already recorded for this ID');
                     }
@@ -1487,17 +1683,18 @@
                     const newAttendanceRef = await window.dbPush(this.attendeesRef, attendanceData);
                     
                     if (!newAttendanceRef) {
-                        showToast('Failed to save attendance record', 'error');
+                        showToast('error', 'Submission Failed', 'Could not save your attendance record. Please try again');
                         showButtonFeedback(submitBtn, 'error');
                         throw new Error('Failed to save attendance record');
                     }
 
                     // Show success message
                     showToast(
+                        isMatchingDevice ? 'success' : 'warning',
+                        isMatchingDevice ? 'Attendance Recorded' : 'Different Device Detected',
                         isMatchingDevice ? 
-                        'Attendance recorded successfully!' : 
-                        'Attendance recorded (different device detected)',
-                        isMatchingDevice ? 'success' : 'warning'
+                            'Your attendance has been successfully recorded!' : 
+                            'Attendance recorded, but from a different device than previous submissions'
                     );
                     showButtonFeedback(submitBtn, 'success');
             
@@ -1517,7 +1714,7 @@
                     
                 } catch (error) {
                     console.error('Attendance submission error:', error);
-                    showToast(error.message, 'error');
+                    showToast('error', 'Submission Error', error.message);
                     showButtonFeedback(submitBtn, 'error');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
@@ -1576,10 +1773,132 @@
             }
         };
 
+        // Add voice recognition functionality
+        const voiceRecognition = {
+            recognition: null,
+            isListening: false,
+            arabicToEnglishNumbers: {
+                'صفر': '0', 'واحد': '1', 'اثنين': '2', 'ثلاثة': '3', 'أربعة': '4',
+                'خمسة': '5', 'ستة': '6', 'سبعة': '7', 'ثمانية': '8', 'تسعة': '9',
+                'واحده': '1', 'اتنين': '2', 'تلاته': '3', 'اربعه': '4', 'خمسه': '5',
+                'سته': '6', 'سبعه': '7', 'تمنيه': '8', 'تسعه': '9',
+                'حد': '1', 'تنين': '2', 'تلت': '3', 'اربع': '4', 'خمس': '5',
+                'ست': '6', 'سبع': '7', 'تمن': '8', 'تسع': '9'
+            },
+
+            init: function() {
+                if ('webkitSpeechRecognition' in window) {
+                    this.recognition = new webkitSpeechRecognition();
+                    this.recognition.continuous = false;
+                    this.recognition.interimResults = true;
+                    this.recognition.lang = 'ar-EG';
+
+                    this.setupEventListeners();
+                } else {
+                    document.getElementById('voiceInputBtn').style.display = 'none';
+                }
+            },
+
+            setupEventListeners: function() {
+                const voiceBtn = document.getElementById('voiceInputBtn');
+                const voiceHelp = document.getElementById('voiceInputHelp');
+                const modal = document.getElementById('voiceModal');
+                const overlay = document.getElementById('voiceModalOverlay');
+
+                voiceBtn.addEventListener('mouseenter', () => {
+                    voiceHelp.classList.add('show');
+                });
+
+                voiceBtn.addEventListener('mouseleave', () => {
+                    if (!this.isListening) {
+                        voiceHelp.classList.remove('show');
+                    }
+                });
+
+                voiceBtn.addEventListener('click', () => {
+                    if (!this.isListening) {
+                        this.startListening();
+                    } else {
+                        this.stopListening();
+                    }
+                });
+
+                overlay.addEventListener('click', () => {
+                    this.stopListening();
+                });
+
+                this.recognition.onstart = () => {
+                    this.isListening = true;
+                    voiceBtn.classList.add('listening');
+                    modal.classList.add('show');
+                    overlay.classList.add('show');
+                    document.getElementById('voiceResult').textContent = '';
+                };
+
+                this.recognition.onend = () => {
+                    this.isListening = false;
+                    voiceBtn.classList.remove('listening');
+                    setTimeout(() => {
+                        modal.classList.remove('show');
+                        overlay.classList.remove('show');
+                        voiceHelp.classList.remove('show');
+                    }, 1000);
+                };
+
+                this.recognition.onresult = (event) => {
+                    const result = event.results[0][0].transcript;
+                    document.getElementById('voiceResult').textContent = result;
+                    
+                    // Convert Arabic text to numbers
+                    const numbers = this.convertArabicTextToNumbers(result);
+                    if (numbers) {
+                        document.getElementById('student_id').value = numbers;
+                        this.stopListening();
+                        showToast('success', 'تم التعرف على الرقم', `تم إدخال الرقم: ${numbers}`);
+                    }
+                };
+
+                this.recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    showToast('error', 'خطأ في التعرف على الصوت', 'برجاء المحاولة مرة أخرى');
+                    this.stopListening();
+                };
+            },
+
+            startListening: function() {
+                if (this.recognition) {
+                    this.recognition.start();
+                }
+            },
+
+            stopListening: function() {
+                if (this.recognition) {
+                    this.recognition.stop();
+                }
+            },
+
+            convertArabicTextToNumbers: function(text) {
+                let numbers = '';
+                const words = text.trim().split(/\s+/);
+                
+                for (let word of words) {
+                    word = word.replace(/[ًٌٍَُِّْ]/g, ''); // Remove Arabic diacritics
+                    if (this.arabicToEnglishNumbers[word]) {
+                        numbers += this.arabicToEnglishNumbers[word];
+                    } else if (/^\d+$/.test(word)) {
+                        numbers += word;
+                    }
+                }
+                
+                return numbers;
+            }
+        };
+
         // Initialize when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
             console.log('DOM loaded, initializing form...');
             formApp.init();
+            voiceRecognition.init();
             
             // Start loading animation
             formApp.startLoadingAnimation();
@@ -1607,25 +1926,65 @@
             toast.className = 'toast';
             icon.className = 'fas';
 
-            // Set content
-            if (type === 'success') {
-                toast.classList.add('success');
-                icon.classList.add('fa-check-circle');
-            } else {
-                toast.classList.add('error');
-                icon.classList.add('fa-exclamation-circle');
+            // Set content and style based on type
+            switch(type) {
+                case 'success':
+                    toast.classList.add('success');
+                    icon.classList.add('fa-check-circle');
+                    title = title || 'Success!';
+                    message = message || 'Operation completed successfully';
+                    break;
+                case 'error':
+                    toast.classList.add('error');
+                    icon.classList.add('fa-exclamation-circle');
+                    title = title || 'Error';
+                    message = message || 'An error occurred';
+                    break;
+                case 'warning':
+                    toast.classList.add('warning');
+                    icon.classList.add('fa-exclamation-triangle');
+                    title = title || 'Warning';
+                    message = message || 'Please check your input';
+                    break;
+                case 'info':
+                    toast.classList.add('info');
+                    icon.classList.add('fa-info-circle');
+                    title = title || 'Information';
+                    message = message || 'Please note';
+                    break;
             }
 
             strong.textContent = title;
             p.textContent = message;
 
-            // Show toast
+            // Show toast with animation
             toast.classList.add('show');
+            
+            // Add sound effect
+            const audio = new Audio();
+            audio.volume = 0.3;
+            
+            switch(type) {
+                case 'success':
+                    audio.src = 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3';
+                    break;
+                case 'error':
+                    audio.src = 'https://assets.mixkit.co/active_storage/sfx/2221/2221-preview.mp3';
+                    break;
+                case 'warning':
+                    audio.src = 'https://assets.mixkit.co/active_storage/sfx/2197/2197-preview.mp3';
+                    break;
+                case 'info':
+                    audio.src = 'https://assets.mixkit.co/active_storage/sfx/2196/2196-preview.mp3';
+                    break;
+            }
+            
+            audio.play().catch(() => {}); // Ignore errors if sound can't play
 
-            // Hide after 3 seconds
+            // Hide after 4 seconds
             setTimeout(() => {
                 toast.classList.remove('show');
-            }, 3000);
+            }, 4000);
         }
 
         function showButtonFeedback(button, type) {
