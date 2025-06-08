@@ -3797,7 +3797,8 @@
                             const row = {
                             'Student ID': student.id,
                             'Name': student.name,
-                            'Section': student.section || ''
+                            'Section': student.section || '',
+                            'Same Device': matched ? (matched.deviceInfo?.isFirstDevice ? 'Yes' : 'No') : 'N/A',
                         };
                         
                         allWeeks.forEach(week => {
@@ -3857,7 +3858,7 @@
                         }
                     });
                 
-                const columnOrder = ['Student ID', 'Name', 'Section'];
+                const columnOrder = ['Student ID', 'Name', 'Section', 'Same Device'];
                 
                 allWeeks.forEach(week => {
                     columnOrder.push(`Week ${week}`);
