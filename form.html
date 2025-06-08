@@ -1777,6 +1777,7 @@
         const voiceRecognition = {
             recognition: null,
             isListening: false,
+            currentDigits: '',
             arabicToEnglishNumbers: {
                 'صفر': '0', 'واحد': '1', 'اثنين': '2', 'ثلاثة': '3', 'أربعة': '4',
                 'خمسة': '5', 'ستة': '6', 'سبعة': '7', 'ثمانية': '8', 'تسعة': '9',
@@ -1789,7 +1790,7 @@
             init: function() {
                 if ('webkitSpeechRecognition' in window) {
                     this.recognition = new webkitSpeechRecognition();
-                    this.recognition.continuous = false;
+                    this.recognition.continuous = true;
                     this.recognition.interimResults = true;
                     this.recognition.lang = 'ar-EG';
 
@@ -1829,6 +1830,7 @@
 
                 this.recognition.onstart = () => {
                     this.isListening = true;
+                    this.currentDigits = '';
                     voiceBtn.classList.add('listening');
                     modal.classList.add('show');
                     overlay.classList.add('show');
@@ -1846,21 +1848,25 @@
                 };
 
                 this.recognition.onresult = (event) => {
-                    const result = event.results[0][0].transcript;
+                    const result = event.results[event.results.length - 1][0].transcript;
                     document.getElementById('voiceResult').textContent = result;
                     
                     // Convert Arabic text to numbers
                     const numbers = this.convertArabicTextToNumbers(result);
                     if (numbers) {
-                        document.getElementById('student_id').value = numbers;
-                        this.stopListening();
-                        showToast('success', 'تم التعرف على الرقم', `تم إدخال الرقم: ${numbers}`);
+                        this.currentDigits += numbers;
+                        if (this.currentDigits.length >= 7) {
+                            const finalNumber = this.currentDigits.slice(0, 7);
+                            document.getElementById('student_id').value = finalNumber;
+                            this.stopListening();
+                            showToast('success', 'Success', '');
+                        }
                     }
                 };
 
                 this.recognition.onerror = (event) => {
                     console.error('Speech recognition error:', event.error);
-                    showToast('error', 'خطأ في التعرف على الصوت', 'برجاء المحاولة مرة أخرى');
+                    showToast('error', 'Error', '');
                     this.stopListening();
                 };
             },
@@ -1931,60 +1937,35 @@
                 case 'success':
                     toast.classList.add('success');
                     icon.classList.add('fa-check-circle');
-                    title = title || 'Success!';
-                    message = message || 'Operation completed successfully';
+                    title = 'Success';
                     break;
                 case 'error':
                     toast.classList.add('error');
                     icon.classList.add('fa-exclamation-circle');
-                    title = title || 'Error';
-                    message = message || 'An error occurred';
+                    title = 'Error';
                     break;
                 case 'warning':
                     toast.classList.add('warning');
                     icon.classList.add('fa-exclamation-triangle');
-                    title = title || 'Warning';
-                    message = message || 'Please check your input';
+                    title = 'Warning';
                     break;
                 case 'info':
                     toast.classList.add('info');
                     icon.classList.add('fa-info-circle');
-                    title = title || 'Information';
-                    message = message || 'Please note';
+                    title = 'Info';
                     break;
             }
 
             strong.textContent = title;
-            p.textContent = message;
+            p.textContent = message || '';
 
             // Show toast with animation
             toast.classList.add('show');
-            
-            // Add sound effect
-            const audio = new Audio();
-            audio.volume = 0.3;
-            
-            switch(type) {
-                case 'success':
-                    audio.src = 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3';
-                    break;
-                case 'error':
-                    audio.src = 'https://assets.mixkit.co/active_storage/sfx/2221/2221-preview.mp3';
-                    break;
-                case 'warning':
-                    audio.src = 'https://assets.mixkit.co/active_storage/sfx/2197/2197-preview.mp3';
-                    break;
-                case 'info':
-                    audio.src = 'https://assets.mixkit.co/active_storage/sfx/2196/2196-preview.mp3';
-                    break;
-            }
-            
-            audio.play().catch(() => {}); // Ignore errors if sound can't play
 
-            // Hide after 4 seconds
+            // Hide after 3 seconds
             setTimeout(() => {
                 toast.classList.remove('show');
-            }, 4000);
+            }, 3000);
         }
 
         function showButtonFeedback(button, type) {
