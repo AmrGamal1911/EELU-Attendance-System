@@ -978,15 +978,18 @@
                 this.updateConnectionStatus('connecting');
                 
                 try {
+                    // Start loading animation
+                    this.startLoadingAnimation();
+                    
                     // First check if session exists and is active
                     console.log('Fetching session data...');
                     const sessionSnapshot = await window.dbGet(window.dbRef(window.database, `sessions/${sessionId}`));
                     const sessionData = sessionSnapshot.val();
                     
                     if (!sessionData) {
-                    this.showNoSession();
-                    return;
-                }
+                        this.showNoSession();
+                        return;
+                    }
 
                     if (!sessionData.active) {
                         this.showClosedSession();
@@ -1057,12 +1060,16 @@
                         }
                     }
 
-                    // Show active session UI
-                    document.getElementById('loadingScreen').classList.add('hidden');
-                    document.getElementById('activeSession').classList.remove('hidden');
+                    // Hide loading screen and show active session UI
+                    document.getElementById('loadingScreen').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('loadingScreen').classList.add('hidden');
+                        document.getElementById('activeSession').classList.remove('hidden');
+                    }, 500);
                     
                     // Update connection status
                     this.updateConnectionStatus('connected');
+                    showToast('success', 'Connected!', 'Session loaded successfully');
 
                 } catch (error) {
                     console.error('Session initialization error:', error);
@@ -1476,7 +1483,7 @@
 
                     // Check device match
                     const isMatchingDevice = checkDeviceMatch();
-                    
+
                     // Verify session is still active
                     const sessionSnapshot = await window.dbGet(this.sessionRef);
                     const currentSession = sessionSnapshot.val();
@@ -1543,7 +1550,7 @@
 
                     // Save attendance record
                     const newAttendanceRef = await window.dbPush(this.attendeesRef, attendanceData);
-            
+                    
                     if (!newAttendanceRef) {
                         showToast('Failed to save attendance record', 'error');
                         showButtonFeedback(submitBtn, 'error');
@@ -1564,7 +1571,7 @@
                     submitBtn.innerHTML = '<i class="fas fa-check"></i> Attendance Recorded';
                     submitBtn.style.background = 'var(--success)';
                     submitBtn.disabled = true;
-            
+                    
                     // Disable form inputs
                     const inputs = form.querySelectorAll('input');
                     inputs.forEach(input => {
@@ -1572,14 +1579,14 @@
                         input.style.opacity = '0.6';
                         input.disabled = true;
                     });
-            
+                    
                 } catch (error) {
                     console.error('Attendance submission error:', error);
                     showToast(error.message, 'error');
                     showButtonFeedback(submitBtn, 'error');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
-            
+                    
                     if (this.sessionData?.useLocation) {
                         this.startLocationCheck();
                     }
