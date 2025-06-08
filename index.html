@@ -2316,7 +2316,7 @@
             100% { transform: translateY(0); box-shadow: var(--shadow-lg); }
         }
 
-        /* Add toast container styles */
+        /* Toast Notifications */
         .toast-container {
             position: fixed;
             top: 20px;
@@ -2325,41 +2325,42 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-            max-width: 350px;
+            pointer-events: none;
         }
 
         .toast {
-            padding: 16px;
-            border-radius: 8px;
             background: white;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            box-shadow: var(--shadow-lg);
             display: flex;
             align-items: center;
-            gap: 12px;
-            animation: slideIn 0.3s ease, fadeOut 0.3s ease 4.7s;
-            pointer-events: none;
-            margin-bottom: 8px;
+            gap: 0.75rem;
+            min-width: 300px;
+            max-width: 400px;
+            pointer-events: all;
+            animation: slideInRight 0.3s ease-out;
             border-left: 4px solid;
         }
 
         .toast.success {
-            border-left-color: var(--success);
+            border-color: var(--success);
         }
 
         .toast.error {
-            border-left-color: var(--error);
-        }
-
-        .toast.warning {
-            border-left-color: var(--warning);
+            border-color: var(--danger);
         }
 
         .toast.info {
-            border-left-color: var(--info);
+            border-color: var(--info);
+        }
+
+        .toast.warning {
+            border-color: var(--warning);
         }
 
         .toast i {
-            font-size: 20px;
+            font-size: 1.25rem;
         }
 
         .toast.success i {
@@ -2367,18 +2368,18 @@
         }
 
         .toast.error i {
-            color: var(--error);
-        }
-
-        .toast.warning i {
-            color: var(--warning);
+            color: var(--danger);
         }
 
         .toast.info i {
             color: var(--info);
         }
 
-        @keyframes slideIn {
+        .toast.warning i {
+            color: var(--warning);
+        }
+
+        @keyframes slideInRight {
             from {
                 transform: translateX(100%);
                 opacity: 0;
@@ -2389,33 +2390,73 @@
             }
         }
 
-        @keyframes fadeOut {
+        @keyframes slideOutRight {
             from {
+                transform: translateX(0);
                 opacity: 1;
             }
             to {
+                transform: translateX(100%);
                 opacity: 0;
             }
         }
 
-        /* Button animations */
-        .button-shake {
-            animation: shake 0.5s ease-in-out;
-        }
-
-        .button-success {
-            animation: nod 0.5s ease-in-out;
-        }
-
+        /* Button Animations */
         @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
+            10%, 90% {
+                transform: translate3d(-2px, 0, 0);
+            }
+            20%, 80% {
+                transform: translate3d(4px, 0, 0);
+            }
+            30%, 50%, 70% {
+                transform: translate3d(-8px, 0, 0);
+            }
+            40%, 60% {
+                transform: translate3d(8px, 0, 0);
+            }
         }
 
         @keyframes nod {
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-5px); }
+            25% { transform: translateY(-8px); }
+            75% { transform: translateY(8px); }
+        }
+
+        .btn {
+            background: var(--gradient);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: transform 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn.shake {
+            animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+            background: var(--danger) !important;
+        }
+
+        .btn.nod {
+            animation: nod 0.6s ease-in-out;
+            background: var(--success) !important;
+        }
+
+        .btn:not(:disabled):hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
         }
     </style>
 
@@ -2664,10 +2705,72 @@
         <i class="fas fa-microphone"></i>
     </div>
 
-    <!-- Add toast container -->
-    <div id="toastContainer" class="toast-container"></div>
+    <div class="toast-container" id="toastContainer"></div>
 
     <script>
+        // Toast notification system
+        const toastSystem = {
+            show: function(message, type = 'info') {
+                const icons = {
+                    success: 'fas fa-check-circle',
+                    error: 'fas fa-exclamation-circle',
+                    warning: 'fas fa-exclamation-triangle',
+                    info: 'fas fa-info-circle'
+                };
+
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.innerHTML = `
+                    <i class="${icons[type]}"></i>
+                    <span>${message}</span>
+                `;
+
+                const container = document.getElementById('toastContainer');
+                container.appendChild(toast);
+
+                // Remove toast after 3 seconds
+                setTimeout(() => {
+                    toast.style.animation = 'slideOutRight 0.3s ease-out forwards';
+                    setTimeout(() => {
+                        container.removeChild(toast);
+                    }, 300);
+                }, 3000);
+            }
+        };
+
+        // Replace all showMessage calls with toast notifications
+        function showMessage(message, type) {
+            toastSystem.show(message, type === 'danger' ? 'error' : type);
+        }
+
+        // Button interaction helper functions
+        function shakeButton(button) {
+            button.classList.remove('nod');
+            button.classList.add('shake');
+            button.style.background = 'var(--danger)';
+            
+            setTimeout(() => {
+                button.classList.remove('shake');
+                setTimeout(() => {
+                    button.style.background = '';
+                }, 500);
+            }, 600);
+        }
+
+        function nodButton(button) {
+            button.classList.remove('shake');
+            button.classList.add('nod');
+            button.style.background = 'var(--success)';
+            
+            setTimeout(() => {
+                button.classList.remove('nod');
+                setTimeout(() => {
+                    button.style.background = '';
+                }, 500);
+            }, 600);
+        }
+
+        // Update the attendance app to use new notifications
         const attendanceApp = {
             rosterData: [],
             currentSessions: [],
@@ -2684,80 +2787,6 @@
             selectedLocation: null,
 
             init: function() {
-                // Generate device ID if not exists
-                if (!localStorage.getItem('deviceId')) {
-                    localStorage.setItem('deviceId', 'device_' + Date.now());
-                }
-                this.deviceId = localStorage.getItem('deviceId');
-                
-                // Initialize file upload
-                const fileUpload = document.querySelector('.file-upload');
-                const fileInput = document.getElementById('roster');
-                const fileNameSpan = document.getElementById('fileName');
-                
-                if (fileUpload && fileInput) {
-                    // Set up drag and drop
-                    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                        fileUpload.addEventListener(eventName, (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                        });
-                    });
-
-                    ['dragenter', 'dragover'].forEach(eventName => {
-                        fileUpload.addEventListener(eventName, () => {
-                            fileUpload.classList.add('bg-blue-50');
-                            fileUpload.style.borderColor = 'var(--primary)';
-                        });
-                    });
-
-                    ['dragleave', 'drop'].forEach(eventName => {
-                        fileUpload.addEventListener(eventName, () => {
-                            fileUpload.classList.remove('bg-blue-50');
-                            fileUpload.style.borderColor = '#d1d5db';
-                        });
-                    });
-
-                    // Handle file drop
-                    fileUpload.addEventListener('drop', (e) => {
-                        const dt = e.dataTransfer;
-                        const files = dt.files;
-                        
-                        if (files.length) {
-                            fileInput.files = files;
-                            const file = files[0];
-                            fileNameSpan.textContent = file.name;
-                            
-                            const subjectFromFile = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
-                            document.getElementById('subjectNameInput').value = subjectFromFile;
-                            
-                            // Process the file
-                            this.processRosterFile(file);
-                        }
-                    });
-
-                    // Handle file selection
-                    fileInput.addEventListener('change', (e) => {
-                        if (e.target.files.length > 0) {
-                            const file = e.target.files[0];
-                            fileNameSpan.textContent = file.name;
-                            
-                            const subjectFromFile = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, ' ');
-                            document.getElementById('subjectNameInput').value = subjectFromFile;
-                            
-                            // Process the file
-                            this.processRosterFile(file);
-                        } else {
-                            fileNameSpan.textContent = 'No file chosen';
-                        }
-                    });
-
-                    // Handle click on file upload area
-                    fileUpload.addEventListener('click', () => {
-                        fileInput.click();
-                    });
-                }
-                
                 localStorage.setItem('deviceId', this.deviceId);
                 this.setupDragAndDrop();
                 
@@ -2856,7 +2885,7 @@
             clearSessionHistory: function() {
                 localStorage.removeItem('sessionHistory');
                 this.renderSessionHistory();
-                this.showFeedback('Session history cleared', 'success');
+                this.showMessage('Session history cleared', 'success');
             },
 
             handleFileSelection: function(e) {
@@ -2928,7 +2957,7 @@
                         }).filter(student => student.id && student.name);
                         
                         if (this.rosterData.length === 0) {
-                            this.showFeedback('No valid student data found. Please check your file format.', 'error');
+                            this.showMessage('No valid student data found. Please check your file format.', 'danger');
                             return;
                         }
                         
@@ -2942,7 +2971,7 @@
                         rosterInfoDiv.classList.remove('hidden');
                         createSessionBtn.disabled = false;
                         
-                        this.showFeedback('Roster uploaded successfully!', 'success');
+                        this.showMessage('Roster uploaded successfully!', 'success');
                         
                         // Log roster data for debugging
                         console.log('Processed roster data:', {
@@ -2954,13 +2983,13 @@
                         
                     } catch (error) {
                         console.error('Error processing roster file:', error);
-                        this.showFeedback('Error processing file. Please check the format.', 'error');
+                        this.showMessage('Error processing file. Please check the format.', 'danger');
                         createSessionBtn.disabled = true;
                     }
                 };
                 
                 reader.onerror = () => {
-                    this.showFeedback('Error reading file', 'error');
+                    this.showMessage('Error reading file', 'danger');
                     createSessionBtn.disabled = true;
                 };
                 
@@ -3071,17 +3100,17 @@
                     const locationDistance = document.getElementById('locationDistance').value || 50;
                     
                     if (!app.rosterData || app.rosterData.length === 0) {
-                        app.showFeedback('Please upload a valid roster file first', 'error');
+                        app.showMessage('Please upload a valid roster file first', 'danger');
                         return;
                     }
                     
                     if (!app.subjectName || !week || !maxAttendees) {
-                        app.showFeedback('Please fill in all required fields', 'error');
+                        app.showMessage('Please fill in all required fields', 'danger');
                         return;
                     }
                     
                     if (useLocation && !app.classLocation) {
-                        app.showFeedback('Please set a location first', 'error');
+                        app.showMessage('Please set a location first', 'danger');
                         return;
                     }
                     
@@ -3090,28 +3119,11 @@
                         try {
                             const sessionId = 'session_' + Date.now();
                             
-                        // Save TA's IP for blocking using multiple services
-                        const ipServices = [
-                            'https://api.ipify.org?format=json',
-                            'https://api.myip.com',
-                            'https://api.ip.sb/jsonip'
-                        ];
-                        
-                        let taIP = 'unknown';
-                        for (const service of ipServices) {
-                            try {
-                                const response = await fetch(service);
-                                if (!response.ok) continue;
-                                
-                                const data = await response.json();
-                                // Different APIs return IP in different fields
-                                taIP = data.ip || data.address || data.myip;
-                                if (taIP) break;
-                            } catch (error) {
-                                console.warn(`Failed to get IP from ${service}:`, error);
-                                continue;
-                            }
-                        }
+                        // Save TA's IP for blocking
+                        const taIP = await fetch('https://api.ipify.org?format=json')
+                            .then(res => res.json())
+                                .then(data => data.ip)
+                                .catch(() => 'unknown');
 
                             const newSession = {
                                 id: sessionId,
@@ -3526,7 +3538,7 @@
                     let session = this.currentSessions.find(s => s.id === sessionId);
                 
                     // If not found in current sessions, try to get from history
-                if (!session) {
+                    if (!session) {
                         const history = JSON.parse(localStorage.getItem('sessionHistory') || '[]');
                         const historySession = history.find(s => s.id === sessionId);
                         
@@ -3548,82 +3560,107 @@
                     }
 
                     if (!session) {
-                        this.showFeedback('Session data not found', 'error');
-                    return;
-                }
-                
-                const roster = session.roster || [];
+                        this.showMessage('Session not found', 'danger');
+                        return;
+                    }
+
+                    const subjectName = session.subject;
+                    const currentWeek = session.week;
+                    const roster = session.roster || [];
                     const attendees = Object.values(session.attendees || {});
-                const currentWeek = parseInt(session.week);
-                const subjectName = session.subject;
-                    const allWeeks = [...(session.existingWeeks || []), currentWeek]
-                        .filter((v, i, a) => a.indexOf(v) === i)
-                        .sort((a, b) => a - b);
-                
-                    // IP flags
-                const ipMap = {};
-                attendees.forEach(a => {
-                        if (!a.deviceInfo?.ip) return;
-                        if (!ipMap[a.deviceInfo.ip]) ipMap[a.deviceInfo.ip] = [];
-                        ipMap[a.deviceInfo.ip].push(a.id);
+
+                    // Get all weeks from student data
+                    const allWeeks = new Set([currentWeek]);
+                    roster.forEach(student => {
+                        if (student.weekData) {
+                            Object.keys(student.weekData).forEach(week => allWeeks.add(Number(week)));
+                        }
+                    });
+                    allWeeks = Array.from(allWeeks).sort((a, b) => a - b);
+
+                    // Process IP notes
+                    const ipNotes = {};
+                    const ipGroups = {};
+                    attendees.forEach(attendee => {
+                        const ip = attendee.deviceInfo?.ip;
+                        if (ip) {
+                            if (!ipGroups[ip]) {
+                                ipGroups[ip] = [];
+                            }
+                            ipGroups[ip].push(attendee);
+                        }
                     });
 
-                    const ipNotes = {};
-                    Object.entries(ipMap).forEach(([ip, ids]) => {
-                        if (ids.length > 1) {
-                            ids.forEach(id => {
-                                ipNotes[id] = `Same IP with ${ids.filter(x => x !== id).join(', ')}`;
+                    Object.values(ipGroups).forEach(group => {
+                        if (group.length > 1) {
+                            group.forEach(attendee => {
+                                ipNotes[attendee.id] = `Same IP with: ${group.filter(a => a.id !== attendee.id).map(a => a.id).join(', ')}`;
                             });
                         }
                     });
 
-                    // Final report data
                     const reportData = [];
-                
-                if (session.existingWeeks?.length > 0) {
+                    
+                    // Get device mappings for all students
+                    const deviceMappingsSnapshot = await window.dbGet(window.dbRef(window.database, 'deviceMappings'));
+                    const deviceMappings = deviceMappingsSnapshot.val() || {};
+
+                    if (allWeeks.length > 1) {
                         roster.forEach(student => {
-                        const matched = attendees.find(a => a.id === student.id);
+                            const matched = attendees.find(a => a.id === student.id);
                             const row = {
-                            'Student ID': student.id,
-                            'Name': student.name,
-                            'Section': student.section || ''
-                        };
-                        
-                        allWeeks.forEach(week => {
-                            if (week === currentWeek) {
+                                'Student ID': student.id,
+                                'Name': student.name,
+                                'Section': student.section || ''
+                            };
+                            
+                            allWeeks.forEach(week => {
+                                if (week === currentWeek) {
                                     row[`Week ${week}`] = matched ? 1 : 0;
                                     row[`Timestamp Week ${week}`] = matched ? 
-                                    new Date(matched.timestamp).toLocaleString() : 'N/A';
-                            } else {
+                                        new Date(matched.timestamp).toLocaleString() : 'N/A';
+                                    // Add device match status for current week
+                                    if (matched) {
+                                        const deviceMapping = deviceMappings[student.id];
+                                        row[`Original Device Week ${week}`] = deviceMapping && deviceMapping.deviceId === matched.deviceInfo.id ? 'Yes' : 'No';
+                                    } else {
+                                        row[`Original Device Week ${week}`] = 'N/A';
+                                    }
+                                } else {
                                     row[`Week ${week}`] = student.weekData?.[week] || 0;
                                     row[`Timestamp Week ${week}`] = student[`Timestamp Week ${week}`] || 'N/A';
-                            }
-                        });
-                        
+                                    row[`Original Device Week ${week}`] = 'N/A';
+                                }
+                            });
+                            
                             row['Total Attendance'] = allWeeks.reduce((sum, week) => {
                                 return sum + (Number(row[`Week ${week}`]) || 0);
-                        }, 0);
+                            }, 0);
 
-                        // Add IP note if applicable
+                            // Add IP note if applicable
                             const ipNote = ipNotes[student.id] || '';
                             row['Note'] = ipNote;
                             
                             reportData.push(row);
-                    });
-                } else {
+                        });
+                    } else {
                         roster.forEach(student => {
-                        const matched = attendees.find(a => a.id === student.id);
-                        const row = {
-                            'Student ID': student.id,
-                            'Name': student.name,
-                            'Section': student.section || '',
+                            const matched = attendees.find(a => a.id === student.id);
+                            const deviceMapping = deviceMappings[student.id];
+                            
+                            const row = {
+                                'Student ID': student.id,
+                                'Name': student.name,
+                                'Section': student.section || '',
                                 [`Week ${currentWeek}`]: matched ? 1 : 0,
                                 'Total Attendance': matched ? 1 : 0,
-                            [`Timestamp Week ${currentWeek}`]: matched ? 
-                                new Date(matched.timestamp).toLocaleString() : 'N/A'
-                        };
+                                [`Timestamp Week ${currentWeek}`]: matched ? 
+                                    new Date(matched.timestamp).toLocaleString() : 'N/A',
+                                'Original Device': matched ? 
+                                    (deviceMapping && deviceMapping.deviceId === matched.deviceInfo.id ? 'Yes' : 'No') : 'N/A'
+                            };
 
-                        // Add IP note if applicable
+                            // Add IP note if applicable
                             const ipNote = ipNotes[student.id] || '';
                             row['Note'] = ipNote;
                             
@@ -3634,6 +3671,7 @@
                     // Add flagged submissions at the end
                     attendees.filter(a => a.notes?.length > 0).forEach(flagged => {
                         if (!reportData.some(r => r['Student ID'] === flagged.id)) {
+                            const deviceMapping = deviceMappings[flagged.id];
                             reportData.push({
                                 'Student ID': flagged.id,
                                 'Name': flagged.name || 'Flagged Submission',
@@ -3641,52 +3679,54 @@
                                 [`Week ${currentWeek}`]: 0,
                                 'Total Attendance': 0,
                                 [`Timestamp Week ${currentWeek}`]: new Date(flagged.timestamp).toLocaleString(),
+                                'Original Device': deviceMapping && deviceMapping.deviceId === flagged.deviceInfo.id ? 'Yes' : 'No',
                                 'Note': flagged.notes.join('; ')
                             });
                         }
                     });
                 
-                const columnOrder = ['Student ID', 'Name', 'Section'];
-                
-                allWeeks.forEach(week => {
-                    columnOrder.push(`Week ${week}`);
-                });
-                
-                columnOrder.push('Total Attendance');
-                
-                allWeeks.forEach(week => {
-                    columnOrder.push(`Timestamp Week ${week}`);
-                });
-
-                // Add Note and Flagged columns
-                columnOrder.push('Note');
-                
-                const reorderedData = reportData.map(row => {
-                    const newRow = {};
-                    columnOrder.forEach(col => {
-                        if (row[col] !== undefined) {
-                            newRow[col] = row[col];
-                        }
+                    const columnOrder = ['Student ID', 'Name', 'Section'];
+                    
+                    allWeeks.forEach(week => {
+                        columnOrder.push(`Week ${week}`);
+                        columnOrder.push(`Original Device Week ${week}`);
                     });
-                    return newRow;
-                });
-                
-                const ws = XLSX.utils.json_to_sheet(reorderedData);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-                
-                const today = new Date();
-                const dateStr = today.toISOString().split('T')[0];
-                let fileName;
-                
-                if (allWeeks.length > 1) {
-                    fileName = `${subjectName} Attendance from Week ${Math.min(...allWeeks)} to ${Math.max(...allWeeks)} ${dateStr}.xlsx`;
-                } else {
-                    fileName = `${subjectName} Attendance for Week ${currentWeek} ${dateStr}.xlsx`;
-                }
-                
-                fileName = fileName.replace(/[^a-zA-Z0-9\s\.\-_]/g, '').replace(/\s+/g, ' ');
-                XLSX.writeFile(wb, fileName);
+                    
+                    columnOrder.push('Total Attendance');
+                    
+                    allWeeks.forEach(week => {
+                        columnOrder.push(`Timestamp Week ${week}`);
+                    });
+
+                    // Add Note and Flagged columns
+                    columnOrder.push('Note');
+                    
+                    const reorderedData = reportData.map(row => {
+                        const newRow = {};
+                        columnOrder.forEach(col => {
+                            if (row[col] !== undefined) {
+                                newRow[col] = row[col];
+                            }
+                        });
+                        return newRow;
+                    });
+                    
+                    const ws = XLSX.utils.json_to_sheet(reorderedData);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+                    
+                    const today = new Date();
+                    const dateStr = today.toISOString().split('T')[0];
+                    let fileName;
+                    
+                    if (allWeeks.length > 1) {
+                        fileName = `${subjectName} Attendance from Week ${Math.min(...allWeeks)} to ${Math.max(...allWeeks)} ${dateStr}.xlsx`;
+                    } else {
+                        fileName = `${subjectName} Attendance for Week ${currentWeek} ${dateStr}.xlsx`;
+                    }
+                    
+                    fileName = fileName.replace(/[^a-zA-Z0-9\s\.\-_]/g, '').replace(/\s+/g, ' ');
+                    XLSX.writeFile(wb, fileName);
                 } catch (error) {
                     console.error('Error exporting attendance report:', error);
                     this.showMessage('Failed to export attendance report: ' + error.message, 'danger');
@@ -3839,10 +3879,6 @@
                 const copyBtn = event.target.closest('.copy-btn');
                 const originalText = copyBtn.innerHTML;
                 copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                
-                // Show toast notification
-                this.showFeedback('Link copied to clipboard!', 'success');
-                
                 setTimeout(() => {
                     copyBtn.innerHTML = originalText;
                 }, 2000);
@@ -4063,14 +4099,7 @@
             },
 
             showMessage: function(text, type) {
-                const messageDiv = document.getElementById('message');
-                messageDiv.textContent = text;
-                messageDiv.className = `alert alert-${type}`;
-                messageDiv.classList.remove('hidden');
-                
-                setTimeout(() => {
-                    messageDiv.classList.add('hidden');
-                }, 5000);
+                toastSystem.show(text, type === 'danger' ? 'error' : type);
             },
 
             openLocationModal: function() {
@@ -4510,89 +4539,6 @@
                     }).join('');
                 
                 historyList.innerHTML = historyHtml;
-            },
-
-            showToast: function(title, message, type = 'info') {
-                const container = document.getElementById('toastContainer');
-                const toast = document.createElement('div');
-                toast.className = `toast ${type}`;
-                
-                const icon = type === 'success' ? 'check-circle' :
-                            type === 'error' ? 'exclamation-circle' :
-                            type === 'warning' ? 'exclamation-triangle' : 'info-circle';
-                
-                toast.innerHTML = `
-                    <i class="fas fa-${icon}"></i>
-                    <div class="toast-content">
-                        <div class="toast-title">${title}</div>
-                        <div class="toast-message">${message}</div>
-                    </div>
-                    <button class="toast-close" onclick="this.parentElement.remove()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                `;
-                
-                container.appendChild(toast);
-                
-                // Remove toast after 3 seconds
-                setTimeout(() => {
-                    if (toast.parentElement) {
-                        toast.remove();
-                    }
-                }, 3000);
-
-                // Animate button based on type
-                const targetBtn = document.activeElement;
-                if (targetBtn && targetBtn.classList.contains('btn')) {
-                    if (type === 'error') {
-                        targetBtn.classList.add('btn-shake', 'btn-error');
-                        setTimeout(() => {
-                            targetBtn.classList.remove('btn-shake', 'btn-error');
-                        }, 500);
-                    } else if (type === 'success') {
-                        targetBtn.classList.add('btn-nod', 'btn-success');
-                        setTimeout(() => {
-                            targetBtn.classList.remove('btn-nod', 'btn-success');
-                        }, 500);
-                    }
-                }
-            },
-
-            // Replace showMessage function
-                        showMessage: function(text, type) {
-                // Convert old message types to toast types
-                const toastType = type === 'danger' ? 'error' : type;
-                this.showFeedback(text, toastType);
-            },
-
-            showFeedback: function(message, type = 'info') {
-                toastSystem.show(message, type);
-                const button = document.querySelector('.btn');
-                if (type === 'error') {
-                    buttonSystem.shake(button);
-                } else if (type === 'success') {
-                    buttonSystem.success(button);
-                }
-            },
-
-            handleError: function(error) {
-                console.error('Error:', error);
-                this.showFeedback(error.message || 'An error occurred', 'error');
-            },
-
-            handleSuccess: function(message) {
-                this.showFeedback(message, 'success');
-            },
-
-            // Add inspection methods to window
-            init: function() {
-                // ... existing init code ...
-
-                // Add debug methods to window for console access
-                window.inspectButton = (buttonId) => {
-                    const button = document.getElementById(buttonId);
-                    return button ? buttonInspector.inspectElement(button) : null;
-                };
             }
         };
 
@@ -4828,8 +4774,6 @@
                     sessionCard.style.animation = 'highlightCard 1s ease-out';
                 }
                 
-                playSound('celebration');
-                
             } catch (error) {
                 console.error('Error creating session:', error);
                 showMessage(error.message, 'danger');
@@ -4848,6 +4792,120 @@
             }
         `;
         document.head.appendChild(style);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const sessionForm = document.getElementById('sessionForm');
+            const createSessionBtn = document.getElementById('createSessionBtn');
+            const rosterInput = document.getElementById('roster');
+            const uploadBtn = rosterInput.nextElementSibling;
+
+            // Handle roster file upload
+            rosterInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                try {
+                    uploadBtn.disabled = true;
+                    const originalContent = uploadBtn.innerHTML;
+                    uploadBtn.innerHTML = '<div class="spinner"></div> Processing...';
+
+                    await attendanceApp.handleRosterUpload(file);
+                    nodButton(uploadBtn);
+                    showMessage('Roster uploaded successfully!', 'success');
+                } catch (error) {
+                    console.error('Roster upload error:', error);
+                    shakeButton(uploadBtn);
+                    showMessage(error.message, 'error');
+                } finally {
+                    setTimeout(() => {
+                        uploadBtn.disabled = false;
+                        uploadBtn.innerHTML = originalContent;
+                    }, 600);
+                }
+            });
+
+            // Handle session creation
+            sessionForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                // Validate form
+                if (!sessionForm.checkValidity()) {
+                    shakeButton(createSessionBtn);
+                    showMessage('Please fill in all required fields', 'error');
+                    return;
+                }
+
+                try {
+                    createSessionBtn.disabled = true;
+                    const originalContent = createSessionBtn.innerHTML;
+                    createSessionBtn.innerHTML = '<div class="spinner"></div> Creating Session...';
+
+                    const week = document.getElementById('week').value;
+                    const password = document.getElementById('password').value || null;
+                    const maxAttendees = parseInt(document.getElementById('max_attendees').value);
+                    const taEmail = document.getElementById('ta_email').value;
+                    const useLocation = document.getElementById('useLocation').checked;
+                    const locationDistance = document.getElementById('locationDistance').value || 50;
+
+                    if (!attendanceApp.rosterData || attendanceApp.rosterData.length === 0) {
+                        throw new Error('Please upload a valid roster file first');
+                    }
+
+                    if (!attendanceApp.subjectName || !week || !maxAttendees) {
+                        throw new Error('Please fill in all required fields');
+                    }
+
+                    if (useLocation && !attendanceApp.classLocation) {
+                        throw new Error('Please set a location first');
+                    }
+
+                    await attendanceApp.createSession({
+                        week,
+                        password,
+                        maxAttendees,
+                        taEmail,
+                        useLocation,
+                        locationDistance
+                    });
+
+                    nodButton(createSessionBtn);
+                    showMessage('Attendance session started successfully!', 'success');
+                } catch (error) {
+                    console.error('Session creation error:', error);
+                    shakeButton(createSessionBtn);
+                    showMessage(error.message, 'error');
+                } finally {
+                    setTimeout(() => {
+                        createSessionBtn.disabled = false;
+                        createSessionBtn.innerHTML = originalContent;
+                    }, 600);
+                }
+            });
+
+            // Handle location button
+            const setLocationBtn = document.getElementById('setLocationBtn');
+            if (setLocationBtn) {
+                setLocationBtn.addEventListener('click', async () => {
+                    try {
+                        setLocationBtn.disabled = true;
+                        const originalContent = setLocationBtn.innerHTML;
+                        setLocationBtn.innerHTML = '<div class="spinner"></div> Opening Location Setup...';
+
+                        await attendanceApp.openLocationSetup();
+                        nodButton(setLocationBtn);
+                    } catch (error) {
+                        console.error('Location setup error:', error);
+                        shakeButton(setLocationBtn);
+                        showMessage(error.message, 'error');
+                    } finally {
+                        setTimeout(() => {
+                            setLocationBtn.disabled = false;
+                            setLocationBtn.innerHTML = originalContent;
+                        }, 600);
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>
