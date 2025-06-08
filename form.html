@@ -392,7 +392,7 @@
             font-weight: 500;
             font-family: var(--font-primary);
         }
-
+        
         .spinner {
             width: 50px;
             height: 50px;
@@ -410,11 +410,11 @@
             border: 3px solid var(--primary);
             animation: prixClipFix 2s linear infinite;
         }
-
+        
         @keyframes rotate {
             100% { transform: rotate(360deg); }
         }
-
+        
         @keyframes prixClipFix {
             0% { clip-path: polygon(50% 50%, 0 0, 0 0, 0 0, 0 0, 0 0); }
             25% { clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 0, 100% 0, 100% 0); }
@@ -442,7 +442,7 @@
             font-size: 1.5rem;
             animation: slideIn 0.5s ease-out;
             animation-delay: 0.2s;
-            opacity: 0;
+                opacity: 0;
             animation-fill-mode: forwards;
             font-family: var(--font-primary);
         }
@@ -461,13 +461,13 @@
             70% { transform: scale(0.9); }
             100% { transform: scale(1); }
         }
-
+        
         .closed-message {
             text-align: center;
             padding: 3rem 2rem;
             animation: fadeScale 0.6s ease-out;
         }
-
+        
         .closed-message i {
             font-size: 4rem;
             color: var(--danger);
@@ -492,7 +492,7 @@
             opacity: 0;
             animation-fill-mode: forwards;
         }
-
+        
         @keyframes shake {
             10%, 90% { transform: translate3d(-1px, 0, 0); }
             20%, 80% { transform: translate3d(2px, 0, 0); }
@@ -526,7 +526,7 @@
             0% { background-position: -1000px 0; }
             100% { background-position: 1000px 0; }
         }
-
+        
         @media (max-width: 480px) {
             .card {
                 padding: 1.75rem;
@@ -540,7 +540,7 @@
             .completion-message i,
             .closed-message i {
                 font-size: 3rem;
-            }
+        }
 
             .session-info {
                 padding: 1.25rem;
@@ -554,22 +554,330 @@
                 padding: 0.875rem 1rem;
             }
         }
-    </style>
 
-    <!-- Simple UI Sound Effects -->
-    <audio id="tapSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
-    <audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2153/2153-preview.mp3" preload="auto"></audio>
-    <audio id="errorSound" src="https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3" preload="auto"></audio>
-    <audio id="toggleSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
-    <audio id="notificationSound" src="https://assets.mixkit.co/active_storage/sfx/1629/1629-preview.mp3" preload="auto"></audio>
-    <audio id="alertSound" src="https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3" preload="auto"></audio>
+        /* Add button shake animation for negative feedback */
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* Add button nod animation for positive feedback */
+        @keyframes nod {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .shake {
+            animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        .nod {
+            animation: nod 0.5s ease-in-out;
+        }
+
+        /* Add loading screen styles */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f0f2f5;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-container {
+            width: 100%;
+            max-width: 700px;
+            text-align: center;
+            position: relative;
+        }
+
+        .logo-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            gap: 30px;
+        }
+
+        .icon {
+            font-size: 28px;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .letter-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .letter {
+            font-size: 60px;
+            font-weight: bold;
+            color: #2c3e50;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .underline {
+            width: 50px;
+            height: 4px;
+            background-color: #e74c3c;
+            margin-top: 5px;
+            transform: scaleX(0);
+            transform-origin: center;
+            transition: transform 0.5s ease;
+        }
+
+        /* Toast notification styles */
+        .toast {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transform: translateX(150%);
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast i {
+            font-size: 1.5rem;
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.success i {
+            color: var(--success);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .toast.error i {
+            color: var(--danger);
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* Button success and error states */
+        .btn.success {
+            background: var(--success);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);
+        }
+
+        .btn.error {
+            background: var(--danger);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1);
+        }
+    </style>
 </head>
 <body>
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-container">
+            <div class="logo-container">
+                <!-- Book icon -->
+                <div class="icon" id="icon1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" fill="#FFD700"></path>
+                        <line x1="8" y1="6" x2="16" y2="6" stroke="#333"></line>
+                        <line x1="8" y1="10" x2="16" y2="10" stroke="#333"></line>
+                        <line x1="8" y1="14" x2="12" y2="14" stroke="#333"></line>
+                    </svg>
+                </div>
+
+                <!-- Pen/Writing icon -->
+                <div class="icon" id="icon2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                        <path d="M2 2l7.586 7.586"></path>
+                        <circle cx="11" cy="11" r="2"></circle>
+                    </svg>
+                </div>
+
+                <!-- Letter E -->
+                <div class="letter-container">
+                    <div class="letter" id="letter1">E</div>
+                    <div class="underline" id="underline1"></div>
+                </div>
+
+                <!-- Letter E -->
+                <div class="letter-container">
+                    <div class="letter" id="letter2">E</div>
+                    <div class="underline" id="underline2"></div>
+                </div>
+
+                <!-- Graduation cap icon -->
+                <div class="icon" id="icon3">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#555"></path>
+                        <path d="M2 7v5"></path>
+                        <path d="M16 10.87v4.63"></path>
+                        <path d="M12 12l8.5 4.5-8.5 4.5L3.5 16.5 12 12"></path>
+                        <path d="M12 21v-9"></path>
+                    </svg>
+                </div>
+
+                <!-- Letter L -->
+                <div class="letter-container">
+                    <div class="letter" id="letter3">L</div>
+                    <div class="underline" id="underline3"></div>
+                </div>
+
+                <!-- Letter U -->
+                <div class="letter-container">
+                    <div class="letter" id="letter4">U</div>
+                    <div class="underline" id="underline4"></div>
+                </div>
+
+                <!-- Document icon -->
+                <div class="icon" id="icon4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#f5f5f5"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </div>
+
+                <!-- Laptop icon -->
+                <div class="icon" id="icon5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="2" y1="20" x2="22" y2="20"></line>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="container" role="main">
         <div class="card">
-            <div id="loadingSection" class="loading" role="status" aria-live="polite">
-                <div class="spinner" aria-hidden="true"></div>
-                <p>Connecting to session...</p>
+            <div id="loadingScreen" class="loading-screen">
+                <div class="loading-container">
+                    <div class="logo-container">
+                        <!-- Book icon -->
+                        <div class="icon" id="icon1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" fill="#FFD700"></path>
+                                <line x1="8" y1="6" x2="16" y2="6" stroke="#333"></line>
+                                <line x1="8" y1="10" x2="16" y2="10" stroke="#333"></line>
+                                <line x1="8" y1="14" x2="12" y2="14" stroke="#333"></line>
+                            </svg>
+                        </div>
+
+                        <!-- Pen/Writing icon -->
+                        <div class="icon" id="icon2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                                <path d="M2 2l7.586 7.586"></path>
+                                <circle cx="11" cy="11" r="2"></circle>
+                            </svg>
+                        </div>
+
+                        <!-- Letter E -->
+                        <div class="letter-container">
+                            <div class="letter" id="letter1">E</div>
+                            <div class="underline" id="underline1"></div>
+                        </div>
+
+                        <!-- Letter E -->
+                        <div class="letter-container">
+                            <div class="letter" id="letter2">E</div>
+                            <div class="underline" id="underline2"></div>
+                        </div>
+
+                        <!-- Graduation cap icon -->
+                        <div class="icon" id="icon3">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#555"></path>
+                                <path d="M2 7v5"></path>
+                                <path d="M16 10.87v4.63"></path>
+                                <path d="M12 12l8.5 4.5-8.5 4.5L3.5 16.5 12 12"></path>
+                                <path d="M12 21v-9"></path>
+                            </svg>
+                        </div>
+
+                        <!-- Letter L -->
+                        <div class="letter-container">
+                            <div class="letter" id="letter3">L</div>
+                            <div class="underline" id="underline3"></div>
+                        </div>
+
+                        <!-- Letter U -->
+                        <div class="letter-container">
+                            <div class="letter" id="letter4">U</div>
+                            <div class="underline" id="underline4"></div>
+                        </div>
+
+                        <!-- Document icon -->
+                        <div class="icon" id="icon4">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#f5f5f5"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </div>
+
+                        <!-- Laptop icon -->
+                        <div class="icon" id="icon5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="2" y1="20" x2="22" y2="20"></line>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div id="activeSession" class="hidden">
@@ -634,6 +942,15 @@
         </div>
     </div>
 
+    <!-- Toast Container -->
+    <div id="toast" class="toast">
+        <i class="fas"></i>
+        <div class="toast-content">
+            <strong></strong>
+            <p></p>
+        </div>
+    </div>
+
     <script>
         const formApp = {
             currentSessionId: null,
@@ -645,27 +962,10 @@
             maxLocationAttempts: 3,
             deviceId: localStorage.getItem('deviceId') || Date.now().toString(),
             currentIP: null,
-            sounds: {
-                tap: document.getElementById('tapSound'),
-                success: document.getElementById('successSound'),
-                error: document.getElementById('errorSound'),
-                toggle: document.getElementById('toggleSound'),
-                notification: document.getElementById('notificationSound'),
-                alert: document.getElementById('alertSound')
-            },
-            
-            lastPlayTime: 0,
-            DEBOUNCE_TIME: 100, // ms
 
             init: async function() {
                 console.log('Initializing form...');
                 
-                // Initialize sounds
-                Object.values(this.sounds).forEach(sound => {
-                    sound.load();
-                    // Set initial volume
-                    sound.volume = 0.3;
-                });
                 const urlParams = new URLSearchParams(window.location.search);
                 const sessionId = urlParams.get('session');
                 
@@ -758,7 +1058,7 @@
                     }
 
                     // Show active session UI
-                    document.getElementById('loadingSection').classList.add('hidden');
+                    document.getElementById('loadingScreen').classList.add('hidden');
                     document.getElementById('activeSession').classList.remove('hidden');
                     
                     // Update connection status
@@ -874,7 +1174,7 @@
 
             showActiveSession: function() {
                 console.log('Showing active session UI');
-                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('loadingScreen').classList.add('hidden');
                 document.getElementById('activeSession').classList.remove('hidden');
                 document.getElementById('closedSession').classList.add('hidden');
                 document.getElementById('noSession').classList.add('hidden');
@@ -890,7 +1190,7 @@
             },
 
             showClosedSession: function() {
-                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('loadingScreen').classList.add('hidden');
                 document.getElementById('activeSession').classList.add('hidden');
                 document.getElementById('closedSession').classList.remove('hidden');
                 document.getElementById('noSession').classList.add('hidden');
@@ -899,7 +1199,7 @@
             },
 
             showNoSession: function() {
-                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('loadingScreen').classList.add('hidden');
                 document.getElementById('activeSession').classList.add('hidden');
                 document.getElementById('closedSession').classList.add('hidden');
                 document.getElementById('noSession').classList.remove('hidden');
@@ -908,7 +1208,7 @@
             },
 
             showSessionFull: function() {
-                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('loadingScreen').classList.add('hidden');
                 document.getElementById('activeSession').classList.add('hidden');
                 document.getElementById('closedSession').classList.add('hidden');
                 document.getElementById('noSession').classList.add('hidden');
@@ -1042,47 +1342,6 @@
                 return R * c; // Distance in meters
             },
 
-            playSound: function(type) {
-                try {
-                    const now = Date.now();
-                    if (now - this.lastPlayTime < this.DEBOUNCE_TIME) return;
-                    
-                    const sound = this.sounds[type];
-                    if (!sound) {
-                        console.warn('Sound not found:', type);
-                        return;
-                    }
-
-                    // Create a new Audio instance for each play to avoid conflicts
-                    const audioClone = new Audio();
-                    audioClone.src = sound.src;
-                    
-                    // Set volume to a reasonable level
-                    audioClone.volume = 0.3;
-                    
-                    const playPromise = audioClone.play();
-                    if (playPromise !== undefined) {
-                        playPromise
-                            .then(() => {
-                                this.lastPlayTime = now;
-                                // Clean up after playing
-                                audioClone.onended = () => {
-                                    audioClone.src = '';
-                                    audioClone.remove();
-                                };
-                            })
-                            .catch(error => {
-                                console.warn('Sound playback failed:', error);
-                                // Try alternative playback method
-                                sound.currentTime = 0;
-                                sound.play().catch(e => console.warn('Fallback playback failed:', e));
-                            });
-                    }
-                } catch (error) {
-                    console.warn('Sound playback failed:', error);
-                }
-            },
-
             showMessage: function(text, type) {
                 const messageDiv = document.getElementById('message');
                 const icon = type === 'success' ? 'check-circle' : 
@@ -1096,8 +1355,15 @@
                 messageDiv.className = `alert alert-${type}`;
                 messageDiv.classList.remove('hidden');
                 
-                this.playSound(type === 'success' ? 'success' : 
-                              type === 'danger' ? 'error' : 'click');
+                // Add button animation based on message type
+                const submitBtn = document.getElementById('submitBtn');
+                if (type === 'success') {
+                    submitBtn.classList.add('nod');
+                    setTimeout(() => submitBtn.classList.remove('nod'), 500);
+                } else if (type === 'danger') {
+                    submitBtn.classList.add('shake');
+                    setTimeout(() => submitBtn.classList.remove('shake'), 820);
+                }
                 
                 setTimeout(() => {
                     messageDiv.classList.add('hidden');
@@ -1113,16 +1379,13 @@
                     case 'connecting':
                         indicator.classList.add('connecting');
                         statusText.textContent = 'Connecting...';
-                        this.playSound('click');
                         break;
                     case 'connected':
                         indicator.classList.add('connected');
                         statusText.textContent = 'Connected';
-                        this.playSound('success');
                         break;
                     case 'error':
                         statusText.textContent = 'Connection Error';
-                        this.playSound('error');
                         break;
                 }
             },
@@ -1210,13 +1473,17 @@
                         <div class="spinner" style="width: 20px; height: 20px;"></div>
                         <span>Processing...</span>
                     `;
-                    this.playSound('click');
 
+                    // Check device match
+                    const isMatchingDevice = checkDeviceMatch();
+                    
                     // Verify session is still active
                     const sessionSnapshot = await window.dbGet(this.sessionRef);
                     const currentSession = sessionSnapshot.val();
                     
                     if (!currentSession || !currentSession.active) {
+                        showToast('Session is no longer active', 'error');
+                        showButtonFeedback(submitBtn, 'error');
                         this.showClosedSession();
                         return;
                     }
@@ -1228,37 +1495,30 @@
                     const student = this.sessionData.roster.find(s => s.id === studentId);
                     const isTA = this.sessionData.taID === studentId || this.currentIP === this.sessionData.taIP;
 
-                    // Show feedback if student not in roster and not TA
                     if (!student && !isTA) {
+                        showToast('Student ID not found in roster', 'error');
+                        showButtonFeedback(submitBtn, 'error');
                         throw new Error('Student ID not found in roster');
                     }
 
-                    // Get student info (for TA, create a special entry)
+                    // Get student info
                     const attendeeInfo = isTA ? {
-                        id: studentId,
-                        name: 'Teaching Assistant',
-                        section: 'Staff',
+                        ...student,
                         isTA: true
                     } : student;
 
                     // Skip password check for TA
                     if (!isTA && this.sessionData.password && password !== this.sessionData.password) {
+                        showToast('Incorrect session password', 'error');
+                        showButtonFeedback(submitBtn, 'error');
                         throw new Error('Incorrect session password');
-                    }
-
-                    // Hide password field for TA
-                    if (isTA) {
-                        const passwordField = document.getElementById('passwordField');
-                        if (passwordField) {
-                            passwordField.classList.add('hidden');
-                            passwordField.querySelector('input').value = '';  // Clear password field
-                            passwordField.querySelector('input').required = false;  // Remove required attribute
-                        }
                     }
 
                     // Check if student already attended
                     const existingAttendee = Object.values(this.sessionData.attendees || {}).find(a => a.id === studentId);
                     if (existingAttendee) {
+                        showToast('Attendance already recorded for this ID', 'error');
+                        showButtonFeedback(submitBtn, 'error');
                         throw new Error('Attendance already recorded for this ID');
                     }
 
@@ -1271,7 +1531,8 @@
                         deviceInfo: {
                             id: this.deviceId,
                             ip: this.currentIP,
-                            userAgent: navigator.userAgent
+                            userAgent: navigator.userAgent,
+                            isFirstDevice: isMatchingDevice
                         },
                         notes: [],
                         weekData: {
@@ -1280,86 +1541,96 @@
                         isTA: isTA
                     };
 
-                    // Check for same IP in existing attendees (skip for TA)
-                    if (!isTA && this.sessionData.attendees) {
-                        const sameIPAttendees = Object.values(this.sessionData.attendees)
-                            .filter(a => a.deviceInfo?.ip === this.currentIP && a.id !== student.id)
-                            .map(a => ({id: a.id, name: a.name}));
-                            
-                        if (sameIPAttendees.length > 0) {
-                            const sameIPInfo = sameIPAttendees.map(a => `${a.id} (${a.name})`).join(', ');
-                            attendanceData.notes.push(`Same IP with: ${sameIPInfo}`);
-                        }
-                    }
-
-                    // If location is enabled, verify it (skip for TA)
-                    if (!isTA && this.sessionData.useLocation) {
-                        const locationVerification = await this.verifyLocation();
-                        if (!locationVerification.success) {
-                            throw new Error(locationVerification.message || 'Location verification failed');
-                        }
-                        
-                        attendanceData.location = {
-                            verified: locationVerification.success,
-                            coordinates: locationVerification.locationData.coordinates,
-                            accuracy: locationVerification.locationData.accuracy,
-                            distance: locationVerification.locationData.distance,
-                            timestamp: locationVerification.locationData.timestamp,
-                            verificationMessage: locationVerification.message
-                        };
-                    }
-
                     // Save attendance record
                     const newAttendanceRef = await window.dbPush(this.attendeesRef, attendanceData);
-                    
+            
                     if (!newAttendanceRef) {
+                        showToast('Failed to save attendance record', 'error');
+                        showButtonFeedback(submitBtn, 'error');
                         throw new Error('Failed to save attendance record');
                     }
 
-                    // Show success message with animation
-                    this.showMessage('✅ Attendance recorded successfully!', 'success');
-                    
-                    // Update UI to show completion
+                    // Show success message
+                    showToast(
+                        isMatchingDevice ? 
+                        'Attendance recorded successfully!' : 
+                        'Attendance recorded (different device detected)',
+                        isMatchingDevice ? 'success' : 'warning'
+                    );
+                    showButtonFeedback(submitBtn, 'success');
+            
+                    // Update UI
                     form.reset();
                     submitBtn.innerHTML = '<i class="fas fa-check"></i> Attendance Recorded';
                     submitBtn.style.background = 'var(--success)';
-                    submitBtn.style.transform = 'scale(1.05)';
-                    setTimeout(() => {
-                        submitBtn.style.transform = 'scale(1)';
-                    }, 200);
                     submitBtn.disabled = true;
-                    
-                    // Disable form inputs with fade effect
+            
+                    // Disable form inputs
                     const inputs = form.querySelectorAll('input');
                     inputs.forEach(input => {
                         input.style.transition = 'opacity 0.3s ease';
                         input.style.opacity = '0.6';
                         input.disabled = true;
                     });
-                    
-                    // Show completion message with animation
-                    const messageDiv = document.getElementById('message');
-                    messageDiv.innerHTML = `
-                        <div class="completion-message">
-                            <i class="fas fa-check-circle"></i>
-                            <h3>Attendance Recorded Successfully!</h3>
-                            <p>You can now close this page.</p>
-                        </div>
-                    `;
-                    messageDiv.className = 'alert alert-success';
-                    messageDiv.style.display = 'block';
-                    
+            
                 } catch (error) {
                     console.error('Attendance submission error:', error);
-                    this.showMessage(error.message, 'danger');
+                    showToast(error.message, 'error');
+                    showButtonFeedback(submitBtn, 'error');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
-                    
-                    // Re-verify location if there was an error
+            
                     if (this.sessionData?.useLocation) {
                         this.startLocationCheck();
                     }
                 }
+            },
+
+            startLoadingAnimation: function() {
+                function animate() {
+                    // Animate icons
+                    animateElement('icon1', 100);
+                    animateElement('icon2', 300);
+                    animateElement('icon3', 500);
+                    animateElement('icon4', 700);
+                    animateElement('icon5', 900);
+                    
+                    // Animate letters and underlines
+                    animateLetterWithUnderline('letter1', 'underline1', 400);
+                    animateLetterWithUnderline('letter2', 'underline2', 600);
+                    animateLetterWithUnderline('letter3', 'underline3', 800);
+                    animateLetterWithUnderline('letter4', 'underline4', 1000);
+                }
+                
+                function animateElement(id, delay) {
+                    setTimeout(() => {
+                        const element = document.getElementById(id);
+                        if (element) {
+                            element.style.opacity = 1;
+                            element.style.transform = 'translateY(0)';
+                        }
+                    }, delay);
+                }
+                
+                function animateLetterWithUnderline(letterId, underlineId, delay) {
+                    setTimeout(() => {
+                        const letter = document.getElementById(letterId);
+                        const underline = document.getElementById(underlineId);
+                        
+                        if (letter) {
+                            letter.style.opacity = 1;
+                            letter.style.transform = 'translateY(0)';
+                        }
+                        
+                        if (underline) {
+                            setTimeout(() => {
+                                underline.style.transform = 'scaleX(1)';
+                            }, 200);
+                        }
+                    }, delay);
+                }
+                
+                animate();
             }
         };
 
@@ -1368,6 +1639,9 @@
             console.log('DOM loaded, initializing form...');
             formApp.init();
             
+            // Start loading animation
+            formApp.startLoadingAnimation();
+            
             // Add form submission handler
             const form = document.getElementById('attendanceForm');
             form.addEventListener('submit', async (e) => {
@@ -1375,41 +1649,59 @@
                 await formApp.submitAttendance();
             });
             
-            // Add sound effects to buttons
-            const submitBtn = document.getElementById('submitBtn');
-            // Add sound effects to buttons
-            document.querySelectorAll('.btn').forEach(btn => {
-                btn.addEventListener('mouseenter', () => {
-                    if (!btn.disabled) {
-                        formApp.playSound('tap');
-                    }
-                });
-                btn.addEventListener('click', () => {
-                    if (!btn.disabled) {
-                        formApp.playSound('toggle');
-                    }
-                });
-            });
-
-            // Add sound effects to form submissions
-            document.querySelectorAll('form').forEach(form => {
-                form.addEventListener('submit', () => {
-                    formApp.playSound('success');
-                });
-            });
-
-            // Add sound effects to inputs
-            document.querySelectorAll('input').forEach(input => {
-                input.addEventListener('focus', () => {
-                    formApp.playSound('tap');
-                });
-            });
-            
             // Clean up when page is closed
             window.addEventListener('beforeunload', () => {
                 formApp.cleanup();
             });
         });
+
+        function showToast(type, title, message) {
+            const toast = document.getElementById('toast');
+            const icon = toast.querySelector('i');
+            const strong = toast.querySelector('strong');
+            const p = toast.querySelector('p');
+
+            // Reset classes
+            toast.className = 'toast';
+            icon.className = 'fas';
+
+            // Set content
+            if (type === 'success') {
+                toast.classList.add('success');
+                icon.classList.add('fa-check-circle');
+            } else {
+                toast.classList.add('error');
+                icon.classList.add('fa-exclamation-circle');
+            }
+
+            strong.textContent = title;
+            p.textContent = message;
+
+            // Show toast
+            toast.classList.add('show');
+
+            // Hide after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function showButtonFeedback(button, type) {
+            // Remove any existing feedback classes
+            button.classList.remove('success', 'error', 'shake', 'pulse');
+            
+            if (type === 'success') {
+                button.classList.add('success', 'pulse');
+                setTimeout(() => {
+                    button.classList.remove('pulse');
+                }, 2000);
+            } else if (type === 'error') {
+                button.classList.add('error', 'shake');
+                setTimeout(() => {
+                    button.classList.remove('shake');
+                }, 500);
+            }
+        }
     </script>
 </body>
 </html>
