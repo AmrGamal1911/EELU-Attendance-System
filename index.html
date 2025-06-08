@@ -338,7 +338,7 @@
         
         @media (max-width: 768px) {
             .container {
-                padding: 1.5rem;
+            padding: 1.5rem;
             }
             
             header h1 {
@@ -539,7 +539,7 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             border: 1px solid #e5e7eb;
         }
-
+        
         .session-item.active {
             border-left: 4px solid var(--success);
         }
@@ -580,7 +580,7 @@
             display: flex;
             gap: 0.5rem;
         }
-
+        
         .btn-sm {
             padding: 0.5rem 1rem;
             font-size: 0.875rem;
@@ -591,7 +591,7 @@
             border-top: 1px solid #e5e7eb;
             padding-top: 1rem;
         }
-
+        
         .attendee-entry {
             background: #f8fafc;
             border-radius: 8px;
@@ -647,17 +647,17 @@
             align-items: center;
             gap: 0.5rem;
         }
-
+        
         .location-status.verified {
             background: rgba(16, 185, 129, 0.1);
             color: #047857;
         }
-
+        
         .location-status.unverified {
             background: rgba(239, 68, 68, 0.1);
             color: #b91c1c;
         }
-
+        
         .empty-state {
             text-align: center;
             padding: 3rem;
@@ -863,16 +863,16 @@
             .attendee-item {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 0.5rem;
+            gap: 0.5rem;
             }
             
             .attendee-time {
                 text-align: left;
-            }
-            
+        }
+        
             .voice-btn:hover {
                 width: 60px;
-                border-radius: 50%;
+            border-radius: 50%;
                 justify-content: center;
                 padding-right: 0;
             }
@@ -901,7 +901,7 @@
             transform: translateY(-5px);
             box-shadow: var(--shadow-lg), 0 30px 60px -15px rgba(79, 70, 229, 0.15);
         }
-
+        
         .session-card::before {
             content: '';
             position: absolute;
@@ -942,13 +942,13 @@
             50% { transform: scale(1.2); opacity: 0.7; }
             100% { transform: scale(1); opacity: 1; }
         }
-
+        
         @keyframes pulse {
             0% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.1); opacity: 0.7; }
             100% { transform: scale(1); opacity: 1; }
         }
-
+        
         .session-info {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -969,7 +969,7 @@
             transform: translateY(-2px);
             box-shadow: var(--shadow);
         }
-
+        
         .session-info-item h3 {
             font-size: 1rem;
             color: var(--text-secondary);
@@ -983,13 +983,13 @@
             color: var(--primary);
             font-size: 1.1rem;
         }
-
+        
         .session-info-item p {
             font-size: 1.25rem;
             color: var(--text-primary);
             font-weight: 600;
         }
-
+        
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -1004,7 +1004,7 @@
         @keyframes fadeIn {
             from {
                 opacity: 0;
-            }
+        }
             to {
                 opacity: 1;
             }
@@ -2232,17 +2232,17 @@
         /* Toast Notification */
         .toast {
             position: fixed;
-            bottom: 2rem;
+            top: 2rem;
             right: 2rem;
-            background: white;
             padding: 1rem 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-lg);
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            transform: translateX(200%);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            gap: 1rem;
+            transform: translateX(150%);
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
             z-index: 1000;
         }
 
@@ -2251,7 +2251,7 @@
         }
 
         .toast i {
-            font-size: 1.2rem;
+            font-size: 1.5rem;
         }
 
         .toast.success {
@@ -2260,6 +2260,48 @@
 
         .toast.success i {
             color: var(--success);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .toast.error i {
+            color: var(--danger);
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* Button success and error states */
+        .btn.success {
+            background: var(--success);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);
+        }
+
+        .btn.error {
+            background: var(--danger);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1);
         }
 
         /* Smooth Scroll Animation */
@@ -2315,83 +2357,440 @@
             50% { transform: translateY(-10px); box-shadow: var(--shadow-lg), 0 30px 60px -15px rgba(79, 70, 229, 0.3); }
             100% { transform: translateY(0); box-shadow: var(--shadow-lg); }
         }
+
+        /* Add button shake animation for negative feedback */
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* Add button nod animation for positive feedback */
+        @keyframes nod {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .shake {
+            animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        .nod {
+            animation: nod 0.5s ease-in-out;
+        }
+
+        /* Add loading screen styles */
+        .initial-loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #f0f2f5;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease;
+        }
+
+        /* Loading screen styles */
+        body {
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        .loading-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f0f2f5;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease;
+        }
+
+        .logo-container {
+            width: 100%;
+            max-width: 700px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            gap: 30px;
+        }
+
+        .icon {
+            font-size: 28px;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .letter-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .letter {
+            font-size: 60px;
+            font-weight: bold;
+            color: #2c3e50;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .underline {
+            width: 50px;
+            height: 4px;
+            background-color: #e74c3c;
+            margin-top: 5px;
+            transform: scaleX(0);
+            transform-origin: center;
+            transition: transform 0.5s ease;
+        }
+
+        /* Toast notification styles */
+        .toast-notification {
+            position: fixed;
+            top: 20px;
+            right: -100%;
+            background: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            transition: right 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .toast-notification.show {
+            right: 20px;
+        }
+
+        .toast-notification i {
+            font-size: 1.25rem;
+        }
+
+        .toast-notification.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast-notification.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .toast-notification.info {
+            border-left: 4px solid var(--info);
+        }
+
+        /* Button animations */
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        @keyframes nod {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .shake {
+            animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both !important;
+        }
+
+        .nod {
+            animation: nod 0.5s ease-in-out !important;
+        }
+
+        /* Add loading screen styles */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f0f2f5;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-container {
+            width: 100%;
+            max-width: 700px;
+            text-align: center;
+            position: relative;
+        }
+
+        .logo-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            gap: 30px;
+        }
+
+        .icon {
+            font-size: 28px;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .letter-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .letter {
+            font-size: 60px;
+            font-weight: bold;
+            color: #2c3e50;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .underline {
+            width: 50px;
+            height: 4px;
+            background-color: #e74c3c;
+            margin-top: 5px;
+            transform: scaleX(0);
+            transform-origin: center;
+            transition: transform 0.5s ease;
+        }
     </style>
 
-    <!-- Professional UI Sound Effects -->
-    <audio id="tapSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/tap.mp3" preload="auto"></audio>
-    <audio id="successSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/celebration.mp3" preload="auto"></audio>
-    <audio id="errorSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/caution.mp3" preload="auto"></audio>
-    <audio id="toggleSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/toggle.mp3" preload="auto"></audio>
-    <audio id="notificationSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/notification.mp3" preload="auto"></audio>
-    <audio id="alertSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/alert.mp3" preload="auto"></audio>
+    <!-- Add initial loading screen that shows only once -->
+    <div id="initialLoadingScreen" class="loading-screen">
+        <div class="loading-container">
+            <div class="logo-container">
+                <!-- Book icon -->
+                <div class="icon" id="icon1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" fill="#FFD700"></path>
+                        <line x1="8" y1="6" x2="16" y2="6" stroke="#333"></line>
+                        <line x1="8" y1="10" x2="16" y2="10" stroke="#333"></line>
+                        <line x1="8" y1="14" x2="12" y2="14" stroke="#333"></line>
+                    </svg>
+                </div>
+
+                <!-- Pen/Writing icon -->
+                <div class="icon" id="icon2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                        <path d="M2 2l7.586 7.586"></path>
+                        <circle cx="11" cy="11" r="2"></circle>
+                    </svg>
+                </div>
+
+                <!-- Letter E -->
+                <div class="letter-container">
+                    <div class="letter" id="letter1">E</div>
+                    <div class="underline" id="underline1"></div>
+                </div>
+
+                <!-- Letter E -->
+                <div class="letter-container">
+                    <div class="letter" id="letter2">E</div>
+                    <div class="underline" id="underline2"></div>
+                </div>
+
+                <!-- Graduation cap icon -->
+                <div class="icon" id="icon3">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#555"></path>
+                        <path d="M2 7v5"></path>
+                        <path d="M16 10.87v4.63"></path>
+                        <path d="M12 12l8.5 4.5-8.5 4.5L3.5 16.5 12 12"></path>
+                        <path d="M12 21v-9"></path>
+                    </svg>
+                </div>
+
+                <!-- Letter L -->
+                <div class="letter-container">
+                    <div class="letter" id="letter3">L</div>
+                    <div class="underline" id="underline3"></div>
+                </div>
+
+                <!-- Letter U -->
+                <div class="letter-container">
+                    <div class="letter" id="letter4">U</div>
+                    <div class="underline" id="underline4"></div>
+                </div>
+
+                <!-- Document icon -->
+                <div class="icon" id="icon4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#f5f5f5"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </div>
+
+                <!-- Laptop icon -->
+                <div class="icon" id="icon5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="2" y1="20" x2="22" y2="20"></line>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
-        // Sound management
-        const sounds = {
-            tap: document.getElementById('tapSound'),
-            success: document.getElementById('successSound'),
-            error: document.getElementById('errorSound'),
-            toggle: document.getElementById('toggleSound'),
-            notification: document.getElementById('notificationSound'),
-            alert: document.getElementById('alertSound')
-        };
-
-        let lastPlayTime = 0;
-        const DEBOUNCE_TIME = 100; // ms
-
-        function playSound(type) {
-            try {
-                const now = Date.now();
-                if (now - lastPlayTime < DEBOUNCE_TIME) return;
+        // Remove all sound-related code and add loading screen logic
+        document.addEventListener('DOMContentLoaded', function() {
+            // Show initial loading screen only if it hasn't been shown before
+            const hasSeenLoading = sessionStorage.getItem('hasSeenLoading');
+            const loadingScreen = document.getElementById('initialLoadingScreen');
+            
+            if (!hasSeenLoading) {
+                // Start the loading animation
+                startLoadingAnimation();
                 
-                const sound = sounds[type];
-                if (sound) {
-                    sound.currentTime = 0;
-                    const playPromise = sound.play();
-                    if (playPromise !== undefined) {
-                        playPromise.catch(error => {
-                            console.warn('Sound playback failed:', error);
-                        });
-                    }
-                    lastPlayTime = now;
-                }
-            } catch (error) {
-                console.warn('Sound playback failed:', error);
+                // Hide loading screen after animation completes
+                setTimeout(() => {
+                    loadingScreen.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingScreen.style.display = 'none';
+                        // Mark as seen
+                        sessionStorage.setItem('hasSeenLoading', 'true');
+                    }, 500);
+                }, 6000);
+            } else {
+                // Hide loading screen immediately if already seen
+                loadingScreen.style.display = 'none';
+            }
+        });
+
+        function startLoadingAnimation() {
+            // Add the loading animation code from the provided example
+            function animate() {
+                // ... loading animation code ...
+            }
+            
+            animate();
+        }
+
+        // Add button feedback animations
+        function showFeedback(element, type) {
+            if (type === 'success') {
+                element.classList.add('nod');
+                setTimeout(() => element.classList.remove('nod'), 500);
+            } else if (type === 'error') {
+                element.classList.add('shake');
+                setTimeout(() => element.classList.remove('shake'), 820);
             }
         }
 
-        // Add sound effects to buttons
-        document.querySelectorAll('.btn').forEach(btn => {
-            btn.addEventListener('mouseenter', () => {
-                if (!btn.disabled) {
-                    playSound('tap');
-                }
-            });
-            btn.addEventListener('click', () => {
-                if (!btn.disabled) {
-                    playSound('toggle');
-                }
-            });
-        });
-
-        // Add sound effects to form submissions
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', () => {
-                playSound('success');
-            });
-        });
-
-        // Add sound effects to toggles
-        document.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(input => {
-            input.addEventListener('change', () => {
-                playSound('toggle');
-            });
-        });
-
-        // ... rest of your existing JavaScript ...
+        // ... rest of the script with sound-related code removed ...
     </script>
 </head>
 <body>
+    <!-- Add loading screen at the start of body -->
+    <div class="loading-container" id="loadingScreen">
+        <div class="logo-container">
+            <!-- Book icon -->
+            <div class="icon" id="icon1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" fill="#FFD700"></path>
+                    <line x1="8" y1="6" x2="16" y2="6" stroke="#333"></line>
+                    <line x1="8" y1="10" x2="16" y2="10" stroke="#333"></line>
+                    <line x1="8" y1="14" x2="12" y2="14" stroke="#333"></line>
+                </svg>
+            </div>
+
+            <!-- Pen/Writing icon -->
+            <div class="icon" id="icon2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                    <path d="M2 2l7.586 7.586"></path>
+                    <circle cx="11" cy="11" r="2"></circle>
+                </svg>
+            </div>
+
+            <!-- Letter E -->
+            <div class="letter-container">
+                <div class="letter" id="letter1">E</div>
+                <div class="underline" id="underline1"></div>
+            </div>
+
+            <!-- Letter E -->
+            <div class="letter-container">
+                <div class="letter" id="letter2">E</div>
+                <div class="underline" id="underline2"></div>
+            </div>
+
+            <!-- Graduation cap icon -->
+            <div class="icon" id="icon3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#555"></path>
+                    <path d="M2 7v5"></path>
+                    <path d="M16 10.87v4.63"></path>
+                    <path d="M12 12l8.5 4.5-8.5 4.5L3.5 16.5 12 12"></path>
+                    <path d="M12 21v-9"></path>
+                </svg>
+            </div>
+
+            <!-- Letter L -->
+            <div class="letter-container">
+                <div class="letter" id="letter3">L</div>
+                <div class="underline" id="underline3"></div>
+            </div>
+
+            <!-- Letter U -->
+            <div class="letter-container">
+                <div class="letter" id="letter4">U</div>
+                <div class="underline" id="underline4"></div>
+            </div>
+
+            <!-- Document icon -->
+            <div class="icon" id="icon4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#f5f5f5"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+            </div>
+
+            <!-- Laptop icon -->
+            <div class="icon" id="icon5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="2" y1="20" x2="22" y2="20"></line>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rest of your body content -->
     <div class="container">
         <header>
             <h1><i class="fas fa-qrcode"></i> EELU Attendance System</h1>
@@ -2526,28 +2925,28 @@
             <div class="qr-container">
                 <p class="text-center">Scan this QR code with your mobile device to set the class location</p>
                 <div id="locationQRCode"></div>
-                
+            
                 <div id="locationStatus" class="alert alert-info">
                     <div id="locationPreview">
                         <i class="fas fa-location-crosshairs"></i>
                         Waiting for location from mobile device...
                     </div>
                     <div class="location-spinner"></div>
-                </div>
-                
-                <div id="locationNameForm" class="hidden">
-                    <div class="form-group">
+            </div>
+
+            <div id="locationNameForm" class="hidden">
+            <div class="form-group">
                         <label for="locationName">
                             <i class="fas fa-tag"></i>
                             Location Name:
                         </label>
-                        <input type="text" id="locationName" placeholder="e.g., Room 101" required>
-                    </div>
-                    <button onclick="attendanceApp.saveLocation()" class="btn btn-success">
+                    <input type="text" id="locationName" placeholder="e.g., Room 101" required>
+            </div>
+                <button onclick="attendanceApp.saveLocation()" class="btn btn-success">
                         <i class="fas fa-save"></i>
                         Save Location
-                    </button>
-                </div>
+                </button>
+            </div>
             </div>
         </div>
     </div>
@@ -3060,7 +3459,7 @@
                     <div class="session-status session-active" id="sessionStatus_${sessionId}">
                         <i class="fas fa-broadcast-tower"></i> 
                         <span>Session Active</span>
-                                                    <div class="sync-status">
+                        <div class="sync-status">
                             <div class="sync-indicator connected" id="syncIndicator_${sessionId}"></div>
                             <span id="syncStatus_${sessionId}"><i class="fas fa-check-circle"></i> Connected</span>
                         </div>
@@ -3987,7 +4386,7 @@
                 if (modal) {
                     modal.classList.remove('active');
                     setTimeout(() => {
-                        modal.classList.add('hidden');
+                modal.classList.add('hidden');
                     }, 300);
                 }
             },
@@ -4565,6 +4964,210 @@
             }
         `;
         document.head.appendChild(style);
+
+        // Loading screen animation
+        function startLoadingAnimation() {
+            function animate() {
+                // Animate icons
+                animateElement('icon1', 100);
+                animateElement('icon2', 300);
+                animateElement('icon3', 500);
+                animateElement('icon4', 700);
+                animateElement('icon5', 900);
+                
+                // Animate letters and underlines
+                animateLetterWithUnderline('letter1', 'underline1', 400);
+                animateLetterWithUnderline('letter2', 'underline2', 600);
+                animateLetterWithUnderline('letter3', 'underline3', 800);
+                animateLetterWithUnderline('letter4', 'underline4', 1000);
+            }
+            
+            function animateElement(id, delay) {
+                setTimeout(() => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.style.opacity = 1;
+                        element.style.transform = 'translateY(0)';
+                    }
+                }, delay);
+            }
+            
+            function animateLetterWithUnderline(letterId, underlineId, delay) {
+                setTimeout(() => {
+                    const letter = document.getElementById(letterId);
+                    const underline = document.getElementById(underlineId);
+                    
+                    if (letter) {
+                        letter.style.opacity = 1;
+                        letter.style.transform = 'translateY(0)';
+                    }
+                    
+                    if (underline) {
+                        setTimeout(() => {
+                            underline.style.transform = 'scaleX(1)';
+                        }, 200);
+                    }
+                }, delay);
+            }
+            
+            animate();
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast-notification ${type}`;
+            
+            const icon = type === 'success' ? 'check-circle' :
+                        type === 'error' ? 'times-circle' : 'info-circle';
+            
+            toast.innerHTML = `
+                <i class="fas fa-${icon}"></i>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Trigger reflow
+            toast.offsetHeight;
+            
+            // Show toast
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+            
+            // Remove toast after delay
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 500);
+            }, 5000);
+        }
+
+        // Button feedback
+        function showButtonFeedback(button, type) {
+            if (type === 'success') {
+                button.classList.add('nod');
+                setTimeout(() => button.classList.remove('nod'), 500);
+            } else if (type === 'error') {
+                button.classList.add('shake');
+                setTimeout(() => button.classList.remove('shake'), 820);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            const loadingScreen = document.getElementById('initialLoadingScreen');
+            
+            // Start loading animation
+            startLoadingAnimation();
+            
+            // Hide loading screen after 3 seconds
+            setTimeout(() => {
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    // Mark as seen
+                    sessionStorage.setItem('hasSeenLoading', 'true');
+                }, 500);
+            }, 3000);
+            
+            // Add button feedback to all buttons
+            document.querySelectorAll('button, .btn').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    // Check if button has required fields
+                    const form = this.closest('form');
+                    if (form) {
+                        const isValid = form.checkValidity();
+                        showButtonFeedback(this, isValid ? 'success' : 'error');
+                        
+                        if (!isValid) {
+                            e.preventDefault();
+                            showToast('Please fill in all required fields', 'error');
+                        }
+                    }
+                });
+            });
+        });
+
+        // Device tracking
+        let firstDeviceId = localStorage.getItem('firstDeviceId');
+        const currentDeviceId = Date.now().toString();
+
+        function checkDeviceMatch() {
+            if (!firstDeviceId) {
+                firstDeviceId = currentDeviceId;
+                localStorage.setItem('firstDeviceId', firstDeviceId);
+                return true;
+            }
+            return firstDeviceId === currentDeviceId;
+        }
+
+        // Modify your existing form submission code to include device checking
+        async function submitAttendance(formData) {
+            const isMatchingDevice = checkDeviceMatch();
+            formData.deviceMatch = isMatchingDevice;
+            
+            try {
+                // Your existing submission code...
+                showToast(isMatchingDevice ? 
+                    'Attendance recorded successfully' : 
+                    'Warning: Different device detected', 
+                    isMatchingDevice ? 'success' : 'warning'
+                );
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function showToast(type, title, message) {
+            const toast = document.getElementById('toast');
+            const icon = toast.querySelector('i');
+            const strong = toast.querySelector('strong');
+            const p = toast.querySelector('p');
+
+            // Reset classes
+            toast.className = 'toast';
+            icon.className = 'fas';
+
+            // Set content
+            if (type === 'success') {
+                toast.classList.add('success');
+                icon.classList.add('fa-check-circle');
+            } else {
+                toast.classList.add('error');
+                icon.classList.add('fa-exclamation-circle');
+            }
+
+            strong.textContent = title;
+            p.textContent = message;
+
+            // Show toast
+            toast.classList.add('show');
+
+            // Hide after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function showButtonFeedback(button, type) {
+            // Remove any existing feedback classes
+            button.classList.remove('success', 'error', 'shake', 'pulse');
+            
+            if (type === 'success') {
+                button.classList.add('success', 'pulse');
+                setTimeout(() => {
+                    button.classList.remove('pulse');
+                }, 2000);
+            } else if (type === 'error') {
+                button.classList.add('error', 'shake');
+                setTimeout(() => {
+                    button.classList.remove('shake');
+                }, 500);
+            }
+        }
     </script>
 </body>
 </html>
