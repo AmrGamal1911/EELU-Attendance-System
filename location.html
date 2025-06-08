@@ -445,6 +445,81 @@
             animation: locationPulse 1.5s ease-in-out infinite;
             color: var(--primary);
         }
+
+        /* Toast notification styles */
+        .toast {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transform: translateX(150%);
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast i {
+            font-size: 1.5rem;
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.success i {
+            color: var(--success);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .toast.error i {
+            color: var(--danger);
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* Button success and error states */
+        .btn.success {
+            background: var(--success);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);
+        }
+
+        .btn.error {
+            background: var(--danger);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -730,6 +805,54 @@
             }
 
             locationStatus.innerHTML = html;
+        }
+
+        function showToast(type, title, message) {
+            const toast = document.getElementById('toast');
+            const icon = toast.querySelector('i');
+            const strong = toast.querySelector('strong');
+            const p = toast.querySelector('p');
+
+            // Reset classes
+            toast.className = 'toast';
+            icon.className = 'fas';
+
+            // Set content
+            if (type === 'success') {
+                toast.classList.add('success');
+                icon.classList.add('fa-check-circle');
+            } else {
+                toast.classList.add('error');
+                icon.classList.add('fa-exclamation-circle');
+            }
+
+            strong.textContent = title;
+            p.textContent = message;
+
+            // Show toast
+            toast.classList.add('show');
+
+            // Hide after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function showButtonFeedback(button, type) {
+            // Remove any existing feedback classes
+            button.classList.remove('success', 'error', 'shake', 'pulse');
+            
+            if (type === 'success') {
+                button.classList.add('success', 'pulse');
+                setTimeout(() => {
+                    button.classList.remove('pulse');
+                }, 2000);
+            } else if (type === 'error') {
+                button.classList.add('error', 'shake');
+                setTimeout(() => {
+                    button.classList.remove('shake');
+                }, 500);
+            }
         }
     </script>
 </body>
