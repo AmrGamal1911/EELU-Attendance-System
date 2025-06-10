@@ -2811,6 +2811,11 @@
                             // Check if this attendance record has explicit device change info
                             if (a.deviceInfo.deviceChanged) {
                                 deviceIdMap[a.id] = 'Yes';
+                                if (a.deviceInfo.firstDeviceId) {
+                                    deviceNotes[a.id] = `Changed from first device: ${a.deviceInfo.firstDeviceId.substring(0, 8)}...`;
+                                } else {
+                                    deviceNotes[a.id] = 'Device changed from first attendance';
+                                }
                             }
                             // Otherwise compare with first device
                             else if (firstDeviceIds[a.id] && a.deviceInfo.id !== firstDeviceIds[a.id]) {
