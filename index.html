@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -2779,9 +2779,27 @@
                     const deviceHistory = {};
                     const deviceNotes = {};
                     
-                    // First, build a history of device IDs for each student
+                    // First, build a history of device IDs for each student and track first device
+                    const firstDeviceIds = {};
+                    
+                    // Sort attendees by timestamp to find the first submission for each student
+                    const sortedAttendees = [...attendees].sort((a, b) => {
+                        const timeA = new Date(a.timestamp || 0).getTime();
+                        const timeB = new Date(b.timestamp || 0).getTime();
+                        return timeA - timeB;
+                    });
+                    
+                    // Find first device used by each student
+                    sortedAttendees.forEach(a => {
+                        if (a.deviceInfo?.id && a.id && !firstDeviceIds[a.id]) {
+                            firstDeviceIds[a.id] = a.deviceInfo.id;
+                        }
+                    });
+                    
+                    // Process all attendees for device tracking
                     attendees.forEach(a => {
                         if (a.deviceInfo?.id && a.id) {
+                            // Add to device history
                             if (!deviceHistory[a.id]) {
                                 deviceHistory[a.id] = [];
                             }
@@ -2790,14 +2808,19 @@
                                 deviceHistory[a.id].push(a.deviceInfo.id);
                             }
                             
-                            // Check if this attendance record has device change info
+                            // Check if this attendance record has explicit device change info
                             if (a.deviceInfo.deviceChanged) {
                                 deviceIdMap[a.id] = 'Yes';
-                                if (a.deviceInfo.previousDeviceId) {
-                                    deviceNotes[a.id] = `Changed from device ID: ${a.deviceInfo.previousDeviceId.substring(0, 8)}...`;
+                                if (a.deviceInfo.firstDeviceId) {
+                                    deviceNotes[a.id] = `Changed from first device: ${a.deviceInfo.firstDeviceId.substring(0, 8)}...`;
                                 } else {
-                                    deviceNotes[a.id] = 'Device changed from previous attendance';
+                                    deviceNotes[a.id] = 'Device changed from first attendance';
                                 }
+                            }
+                            // Otherwise compare with first device
+                            else if (firstDeviceIds[a.id] && a.deviceInfo.id !== firstDeviceIds[a.id]) {
+                                deviceIdMap[a.id] = 'Yes';
+                                deviceNotes[a.id] = `Different from first device used`;
                             }
                         }
                     });
@@ -2805,10 +2828,21 @@
                     // Then determine if device was changed for any remaining students
                     attendees.forEach(a => {
                         if (a.id && !deviceIdMap[a.id]) {
-                            // Device changed if student has multiple device IDs
-                            if (deviceHistory[a.id]?.length > 1) {
-                                deviceIdMap[a.id] = 'Yes';
-                                deviceNotes[a.id] = `Used ${deviceHistory[a.id].length} different devices`;
+                            // If we have a first device ID for this student
+                            if (firstDeviceIds[a.id]) {
+                                // If current device matches first device
+                                if (a.deviceInfo?.id === firstDeviceIds[a.id]) {
+                                    deviceIdMap[a.id] = 'No';
+                                } 
+                                // If current device doesn't match first device
+                                else if (a.deviceInfo?.id) {
+                                    deviceIdMap[a.id] = 'Yes';
+                                    deviceNotes[a.id] = 'Using different device than first attendance';
+                                }
+                                // No device info
+                                else {
+                                    deviceIdMap[a.id] = 'Unknown';
+                                }
                             } else {
                                 deviceIdMap[a.id] = 'No';
                             }
@@ -2918,7 +2952,10 @@
                                 [`Week ${currentWeek}`]: 0,
                                 'Total Attendance': 0,
                                 [`Timestamp Week ${currentWeek}`]: new Date(flagged.timestamp).toLocaleString(),
-                                'Device Changed': flagged.deviceInfo?.deviceChanged ? 'Yes' : deviceIdMap[flagged.id] || 'No',
+                                'Device Changed': flagged.deviceInfo?.deviceChanged ? 'Yes' : 
+                                                 (flagged.deviceInfo?.id && firstDeviceIds[flagged.id] && 
+                                                  flagged.deviceInfo.id !== firstDeviceIds[flagged.id]) ? 'Yes' : 
+                                                  deviceIdMap[flagged.id] || 'No',
                                 'Notes': notes.join('; ')
                             });
                         }
