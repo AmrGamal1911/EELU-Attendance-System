@@ -448,39 +448,9 @@
         </div>
     </div>
 
-    <audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3" preload="auto"></audio>
-    <audio id="errorSound" src="https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3" preload="auto"></audio>
-    <audio id="clickSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
-
     <script>
-        // Add sound effects
-        const sounds = {
-            success: document.getElementById('successSound'),
-            error: document.getElementById('errorSound'),
-            click: document.getElementById('clickSound')
-        };
 
-        function playSound(type) {
-            try {
-                if (sounds[type]) {
-                    sounds[type].currentTime = 0;
-                    sounds[type].play();
-                }
-            } catch (error) {
-                // Silent error handling for sound playback issues
-            }
-        }
 
-        // Add hover sound to buttons
-        document.querySelectorAll('.btn').forEach(btn => {
-            btn.addEventListener('mouseenter', () => {
-                if (!btn.disabled) {
-                    playSound('click');
-                }
-            });
-        });
-
-        // Enhanced showMessage function with sound
         function showMessage(text, type) {
             const messageDiv = document.getElementById('message');
             const icon = type === 'success' ? 'check-circle' : 
@@ -494,8 +464,6 @@
             messageDiv.className = `alert alert-${type}`;
             messageDiv.style.display = 'flex';
             
-            playSound(type === 'success' ? 'success' : 
-                     type === 'danger' ? 'error' : 'click');
         }
 
         // Original initialization code
