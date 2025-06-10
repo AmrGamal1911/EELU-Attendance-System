@@ -992,6 +992,37 @@
                         });
                     }
                     
+                    // Also check all previous sessions for this student's first device
+                    try {
+                        // Get all sessions
+                        const allSessionsRef = window.dbRef(window.database, 'sessions');
+                        const allSessionsSnapshot = await window.dbGet(allSessionsRef);
+                        
+                        if (allSessionsSnapshot.exists()) {
+                            const allSessions = allSessionsSnapshot.val() || {};
+                            
+                            // Track first device used by each student across all sessions
+                            this.firstDeviceIds = {};
+                            
+                            // Go through all sessions
+                            Object.values(allSessions).forEach(session => {
+                                if (session.attendees) {
+                                    // Go through attendees in this session
+                                    Object.values(session.attendees).forEach(attendee => {
+                                        // If student has device info and we haven't recorded their first device yet
+                                        if (attendee.id && attendee.deviceInfo && attendee.deviceInfo.id && !this.firstDeviceIds[attendee.id]) {
+                                            this.firstDeviceIds[attendee.id] = attendee.deviceInfo.id;
+                                        }
+                                    });
+                                }
+                            });
+                            
+                            console.log('Loaded first device IDs for students:', this.firstDeviceIds);
+                        }
+                    } catch (error) {
+                        console.error('Error loading previous sessions:', error);
+                    }
+                    
                     // Connection successful
                     statusIndicator.className = 'status-indicator connected';
                     statusText.textContent = 'Connected to server';
@@ -1594,10 +1625,13 @@
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
                         
-                        // Add shake animation to the button
-                        submitBtn.classList.add('shake');
+                        // Add shake animation and error state to the button
+                        submitBtn.classList.add('shake', 'error-state');
                         setTimeout(() => {
                             submitBtn.classList.remove('shake');
+                            setTimeout(() => {
+                                submitBtn.classList.remove('error-state');
+                            }, 1000);
                         }, 1200);
                         
                         return;
@@ -1607,12 +1641,15 @@
                     if (!passwordGroup.classList.contains('hidden') && this.sessionData.password && password !== this.sessionData.password) {
                         this.showFieldError(passwordInput, 'Incorrect session password');
                         
-                        // Add shake animation to the button
+                        // Add shake animation and error state to the button
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
-                        submitBtn.classList.add('shake');
+                        submitBtn.classList.add('shake', 'error-state');
                         setTimeout(() => {
                             submitBtn.classList.remove('shake');
+                            setTimeout(() => {
+                                submitBtn.classList.remove('error-state');
+                            }, 1000);
                         }, 1200);
                         
                         return;
@@ -1623,12 +1660,15 @@
                     if (!student) {
                         this.showFieldError(studentIdInput, 'Student ID not found in roster');
                         
-                        // Add shake animation to the button
+                        // Add shake animation and error state to the button
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
-                        submitBtn.classList.add('shake');
+                        submitBtn.classList.add('shake', 'error-state');
                         setTimeout(() => {
                             submitBtn.classList.remove('shake');
+                            setTimeout(() => {
+                                submitBtn.classList.remove('error-state');
+                            }, 1000);
                         }, 1200);
                         
                         return;
@@ -1639,12 +1679,15 @@
                     if (existingAttendee) {
                         this.showFieldError(studentIdInput, 'Attendance already recorded for this ID');
                         
-                        // Add shake animation to the button
+                        // Add shake animation and error state to the button
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
-                        submitBtn.classList.add('shake');
+                        submitBtn.classList.add('shake', 'error-state');
                         setTimeout(() => {
                             submitBtn.classList.remove('shake');
+                            setTimeout(() => {
+                                submitBtn.classList.remove('error-state');
+                            }, 1000);
                         }, 1200);
                         
                         return;
@@ -1669,15 +1712,19 @@
                         }
                     };
 
-                    // Check if this is the first time this student ID is using this device
-                    const previousDeviceId = this.sameDeviceIds[studentId];
-                    if (previousDeviceId) {
-                        // If student has previously used a different device
-                        if (previousDeviceId !== this.deviceId) {
+                    // Check for device changes against the FIRST device used by this student
+                    const firstDeviceId = this.firstDeviceIds[studentId];
+                    
+                    if (firstDeviceId) {
+                        // If this is not the first submission and the device is different from the first one
+                        if (firstDeviceId !== this.deviceId) {
                             attendanceData.deviceInfo.deviceChanged = true;
-                            attendanceData.deviceInfo.previousDeviceId = previousDeviceId;
-                            attendanceData.notes.push(`Using different device than previous attendance`);
+                            attendanceData.deviceInfo.firstDeviceId = firstDeviceId;
+                            attendanceData.notes.push(`Using different device than first attendance`);
                         }
+                    } else {
+                        // This is the first submission for this student ID
+                        console.log(`First submission for student ID ${studentId}, registering device ${this.deviceId}`);
                     }
 
                     // Check for same IP in existing attendees
