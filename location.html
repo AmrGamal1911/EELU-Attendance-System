@@ -37,7 +37,6 @@
                 });
                 return true;
             } catch (error) {
-                console.error('Error saving location:', error);
                 return false;
             }
         };
@@ -65,13 +64,13 @@
             --font-primary: 'Poppins', system-ui, -apple-system, sans-serif;
             --font-secondary: 'Inter', system-ui, -apple-system, sans-serif;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: var(--font-secondary);
             background: var(--light-bg);
@@ -86,7 +85,7 @@
                 linear-gradient(to bottom right, rgba(79, 70, 229, 0.02) 0%, rgba(124, 58, 237, 0.02) 100%);
             line-height: 1.5;
         }
-        
+
         .container {
             max-width: 550px;
             width: 100%;
@@ -100,7 +99,7 @@
             animation: fadeScale 0.6s ease-out;
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        
+
         .container::before {
             content: '';
             position: absolute;
@@ -134,7 +133,7 @@
             -webkit-text-fill-color: transparent;
             animation: float 3s ease-in-out infinite;
         }
-        
+
         .btn {
             background: var(--gradient);
             color: white;
@@ -170,7 +169,7 @@
             transform: translateX(-100%);
             transition: transform 0.5s ease;
         }
-        
+
         .btn:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow);
@@ -179,7 +178,7 @@
         .btn:hover::before {
             transform: translateX(100%);
         }
-        
+
         .btn:disabled {
             background: #d1d5db;
             cursor: not-allowed;
@@ -194,7 +193,7 @@
         .btn:hover i {
             transform: rotate(15deg);
         }
-        
+
         .alert {
             padding: 1.25rem;
             border-radius: var(--border-radius);
@@ -210,13 +209,13 @@
             font-size: 1.25rem;
             flex-shrink: 0;
         }
-        
+
         .alert-success {
             background: rgba(16, 185, 129, 0.1);
             color: #047857;
             border: 1px solid rgba(16, 185, 129, 0.2);
         }
-        
+
         .alert-danger {
             background: rgba(239, 68, 68, 0.1);
             color: #b91c1c;
@@ -363,12 +362,6 @@
             100% { background-position: 1000px 0; }
         }
 
-        @keyframes locationPulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.7; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
         @media (max-width: 640px) {
             .container {
                 padding: 1.75rem;
@@ -405,127 +398,12 @@
                 scroll-behavior: auto !important;
             }
         }
-
-        .location-icon {
-            font-size: 2rem;
-            color: var(--primary);
-            margin-bottom: 1rem;
-            animation: locationPulse 1.5s ease-in-out infinite;
-        }
-
-        @keyframes locationPulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.7; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        .location-status {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-            font-size: 0.95rem;
-            color: var(--text-secondary);
-        }
-
-        .location-status i {
-            color: var(--primary);
-            animation: locationPulse 1.5s ease-in-out infinite;
-        }
-
-        .location-status.success i {
-            color: var(--success);
-        }
-
-        .location-status.error i {
-            color: var(--danger);
-        }
-
-        .fas.fa-location-crosshairs {
-            animation: locationPulse 1.5s ease-in-out infinite;
-            color: var(--primary);
-        }
-
-        /* Toast notification styles */
-        .toast {
-            position: fixed;
-            top: 2rem;
-            right: 2rem;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            background: white;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            transform: translateX(150%);
-            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            z-index: 1000;
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast i {
-            font-size: 1.5rem;
-        }
-
-        .toast.success {
-            border-left: 4px solid var(--success);
-        }
-
-        .toast.success i {
-            color: var(--success);
-        }
-
-        .toast.error {
-            border-left: 4px solid var(--danger);
-        }
-
-        .toast.error i {
-            color: var(--danger);
-        }
-
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-
-        .shake {
-            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-        }
-
-        @keyframes shake {
-            10%, 90% { transform: translate3d(-1px, 0, 0); }
-            20%, 80% { transform: translate3d(2px, 0, 0); }
-            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-            40%, 60% { transform: translate3d(4px, 0, 0); }
-        }
-
-        /* Button success and error states */
-        .btn.success {
-            background: var(--success);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);
-        }
-
-        .btn.error {
-            background: var(--danger);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1);
-        }
     </style>
 </head>
 <body>
     <div class="container" role="main">
         <h1><i class="fas fa-map-marker-alt" aria-hidden="true"></i> Set Class Location</h1>
-        <div id="message" class="alert" role="alert" aria-live="polite"></div>
+        <div id="message" class="alert" style="display: none;" role="alert" aria-live="polite"></div>
         
         <div class="location-section">
             <div class="location-indicator" role="presentation">
@@ -539,7 +417,7 @@
             <div id="locationStatus" class="status-container" role="status" aria-live="polite">
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle" aria-hidden="true"></i>
-                    <span>Waiting for location...</span>
+                    <span>Tap the button above to share your current location</span>
                 </div>
             </div>
             
@@ -570,60 +448,37 @@
         </div>
     </div>
 
-    <!-- Professional UI Sound Effects -->
-    <audio id="tapSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/tap.mp3" preload="auto"></audio>
-    <audio id="successSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/celebration.mp3" preload="auto"></audio>
-    <audio id="errorSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/caution.mp3" preload="auto"></audio>
-    <audio id="toggleSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/toggle.mp3" preload="auto"></audio>
-    <audio id="notificationSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/notification.mp3" preload="auto"></audio>
-    <audio id="alertSound" src="https://cdn.jsdelivr.net/gh/snd-lib/snd-lib@v1.2.3/dist/sounds/alert.mp3" preload="auto"></audio>
+    <audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3" preload="auto"></audio>
+    <audio id="errorSound" src="https://assets.mixkit.co/active_storage/sfx/2193/2193-preview.mp3" preload="auto"></audio>
+    <audio id="clickSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
 
     <script>
-        // Add sound effects with enhanced error handling
+        // Add sound effects
         const sounds = {
-            tap: document.getElementById('tapSound'),
             success: document.getElementById('successSound'),
             error: document.getElementById('errorSound'),
-            toggle: document.getElementById('toggleSound'),
-            notification: document.getElementById('notificationSound'),
-            alert: document.getElementById('alertSound')
+            click: document.getElementById('clickSound')
         };
-
-        let lastPlayTime = 0;
-        const DEBOUNCE_TIME = 100; // ms
 
         function playSound(type) {
             try {
-                const sound = sounds[type];
-                if (sound && sound.play && typeof sound.play === 'function') {
-                    sound.currentTime = 0;
-                    const playPromise = sound.play();
-                    if (playPromise !== undefined) {
-                        playPromise.catch(error => {
-                            console.warn('Sound playback failed:', error);
-                            // Silently fail - don't affect user experience
-                        });
-                    }
+                if (sounds[type]) {
+                    sounds[type].currentTime = 0;
+                    sounds[type].play();
                 }
             } catch (error) {
-                console.warn('Sound playback failed:', error);
-                // Silently fail - don't affect user experience
+                // Silent error handling for sound playback issues
             }
         }
 
-        function showSpinner(show) {
-            const spinner = document.getElementById('spinner');
-            const getLocationBtn = document.getElementById('getLocationBtn');
-            
-            // Add null checks
-            if (spinner) {
-                spinner.style.display = show ? 'block' : 'none';
-            }
-            
-            if (getLocationBtn) {
-                getLocationBtn.disabled = show;
-            }
-        }
+        // Add hover sound to buttons
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                if (!btn.disabled) {
+                    playSound('click');
+                }
+            });
+        });
 
         // Enhanced showMessage function with sound
         function showMessage(text, type) {
@@ -648,18 +503,28 @@
         const sessionId = urlParams.get('session');
 
         if (!sessionId) {
-            showMessage('Invalid session. Please scan the QR code again.', 'danger');
+            showMessage('Please scan the QR code provided by your instructor to access this page.', 'danger');
             document.getElementById('getLocationBtn').disabled = true;
+        }
+
+        function showSpinner(show) {
+            const locationStatus = document.getElementById('locationStatus');
+            if (show) {
+                locationStatus.innerHTML = '<div class="spinner"></div>';
+                document.getElementById('getLocationBtn').disabled = true;
+            } else {
+                document.getElementById('getLocationBtn').disabled = false;
+            }
         }
 
         document.getElementById('getLocationBtn').addEventListener('click', async function() {
             if (!navigator.geolocation) {
-                showMessage('Geolocation is not supported by your browser.', 'danger');
+                showMessage('Your browser doesn\'t support location sharing. Please try a different browser.', 'danger');
                 return;
             }
 
             showSpinner(true);
-            showMessage('Getting your location...', 'info');
+            showMessage('Accessing your location...', 'info');
 
             try {
                 const position = await new Promise((resolve, reject) => {
@@ -683,10 +548,10 @@
                 const success = await window.sendLocationToFirebase(locationData, sessionId);
                 
                 if (success) {
-                    showMessage('Location set successfully!', 'success');
+                    showMessage('Location recorded successfully!', 'success');
                     document.getElementById('locationStatus').innerHTML = `
                         <div class="alert alert-success">
-                            <i class="fas fa-check-circle"></i> Location set successfully!
+                            <i class="fas fa-check-circle"></i> Location has been sent to your instructor!
                         </div>
                     `;
                     // Force close the page using multiple methods
@@ -698,28 +563,28 @@
                             history.back();
                             window.location.replace('about:blank');
                         } catch (e) {
-                            console.error('Error closing window:', e);
+                            // Silent error handling
                         }
                     }, 1000);
                 } else {
-                    throw new Error('Failed to save location');
+                    throw new Error('Unable to save location data. Please try again.');
                 }
 
             } catch (error) {
-                let errorMessage = 'Error getting location: ';
+                let errorMessage = '';
                 
                 switch(error.code) {
                     case 1:
-                        errorMessage += 'Permission denied. Please allow location access.';
+                        errorMessage = 'Location access was denied. Please allow location access in your browser settings.';
                         break;
                     case 2:
-                        errorMessage += 'Position unavailable. Please try again.';
+                        errorMessage = 'We couldn\'t determine your current location. Please try again in a different area.';
                         break;
                     case 3:
-                        errorMessage += 'Timeout. Please try again.';
+                        errorMessage = 'Location request timed out. Please check your connection and try again.';
                         break;
                     default:
-                        errorMessage += error.message || 'Unknown error occurred.';
+                        errorMessage = error.message || 'An error occurred while getting your location. Please try again.';
                 }
                 
                 showMessage(errorMessage, 'danger');
@@ -732,128 +597,32 @@
             const locationName = document.getElementById('locationName').value.trim();
             
             if (!locationName) {
-                showMessage('Please enter a location name', 'danger');
+                showMessage('Please enter a name for this location', 'danger');
                 return;
             }
             
             // Clean up Firebase reference before closing
-            const locationRef = ref(window.database, `temp-locations/${sessionId}`);
-            set(locationRef, null)
-                .then(() => {
-                    // Clear any existing listeners
-                    window.dbOff(locationRef);
-                    window.close();
-                })
-                .catch((error) => {
-                    console.error('Error cleaning up:', error);
-                    window.close();
-                });
+            if (window.database && window.ref) {
+                const locationRef = window.ref(window.database, `temp-locations/${sessionId}`);
+                window.set(locationRef, null)
+                    .then(() => {
+                        window.close();
+                    })
+                    .catch(() => {
+                        window.close();
+                    });
+            } else {
+                window.close();
+            }
         }
 
         // Clean up on page unload
         window.addEventListener('beforeunload', () => {
-            if (sessionId) {
-                const locationRef = ref(window.database, `temp-locations/${sessionId}`);
-                set(locationRef, null).catch(console.error);
+            if (sessionId && window.database && window.ref) {
+                const locationRef = window.ref(window.database, `temp-locations/${sessionId}`);
+                window.set(locationRef, null).catch(() => {});
             }
         });
-
-        // Add sound effects to buttons
-        document.querySelectorAll('.btn').forEach(btn => {
-            btn.addEventListener('mouseenter', () => {
-                if (!btn.disabled) {
-                    playSound('tap');
-                }
-            });
-            btn.addEventListener('click', () => {
-                if (!btn.disabled) {
-                    playSound('toggle');
-                }
-            });
-        });
-
-        // Add sound effects to form submissions
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', () => {
-                playSound('success');
-            });
-        });
-
-        // Add sound effects to inputs
-        document.querySelectorAll('input').forEach(input => {
-            input.addEventListener('focus', () => {
-                playSound('tap');
-            });
-        });
-
-        function showLocationStatus(isValid, message, distance, maxDistance) {
-            const locationStatus = document.getElementById('locationStatus');
-            locationStatus.className = `alert ${isValid ? 'alert-success' : 'alert-danger'}`;
-            locationStatus.classList.remove('hidden');
-            
-            let html = `
-                <i class="fas fa-location-crosshairs location-icon"></i> 
-                ${message}
-            `;
-
-            if (typeof distance !== 'undefined' && !isValid) {
-                html += `
-                    <div style="margin-top: 0.5rem; font-size: 0.9em;">
-                        <strong>You must be within ${maxDistance}m of the room to submit attendance.</strong>
-                    </div>
-                `;
-            }
-
-            locationStatus.innerHTML = html;
-        }
-
-        function showToast(type, title, message) {
-            const toast = document.getElementById('toast');
-            const icon = toast.querySelector('i');
-            const strong = toast.querySelector('strong');
-            const p = toast.querySelector('p');
-
-            // Reset classes
-            toast.className = 'toast';
-            icon.className = 'fas';
-
-            // Set content
-            if (type === 'success') {
-                toast.classList.add('success');
-                icon.classList.add('fa-check-circle');
-            } else {
-                toast.classList.add('error');
-                icon.classList.add('fa-exclamation-circle');
-            }
-
-            strong.textContent = title;
-            p.textContent = message;
-
-            // Show toast
-            toast.classList.add('show');
-
-            // Hide after 3 seconds
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
-        }
-
-        function showButtonFeedback(button, type) {
-            // Remove any existing feedback classes
-            button.classList.remove('success', 'error', 'shake', 'pulse');
-            
-            if (type === 'success') {
-                button.classList.add('success', 'pulse');
-                setTimeout(() => {
-                    button.classList.remove('pulse');
-                }, 2000);
-            } else if (type === 'error') {
-                button.classList.add('error', 'shake');
-                setTimeout(() => {
-                    button.classList.remove('shake');
-                }, 500);
-            }
-        }
     </script>
 </body>
 </html> 
