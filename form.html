@@ -1244,7 +1244,7 @@
                             const submitBtn = document.getElementById('submitBtn');
                             submitBtn.disabled = !isWithinRange;
 
-                            // Show location status
+                            // Show location status - only in the dedicated area above the button
                             this.showLocationStatus(
                                 isWithinRange,
                                 isWithinRange ? 
@@ -1498,15 +1498,13 @@
                     const locationResult = await this.verifyLocation();
                     console.log('Location check result:', locationResult.success ? 'Success' : 'Failed');
                     
-                    if (locationResult.success) {
-                        this.showMessage(locationResult.message, 'success');
-                    } else {
-                        this.showMessage(locationResult.message, 'danger');
+                    // Don't show toast notification here, as it's already shown in showLocationStatus
+                    if (!locationResult.success) {
                         document.getElementById('submitBtn').disabled = true;
                     }
                 } catch (error) {
                     console.error('Location check error:', error);
-                    this.showMessage('Failed to verify location: ' + error.message, 'danger');
+                    this.showLocationStatus(false, 'Failed to verify location: ' + error.message);
                     document.getElementById('submitBtn').disabled = true;
                 }
             },
@@ -1548,6 +1546,9 @@
                 }
 
                 locationStatus.innerHTML = html;
+                
+                // Also show toast notification
+                this.showMessage(message, isValid ? 'success' : 'danger');
             },
 
             submitAttendance: async function() {
@@ -1658,7 +1659,9 @@
                         deviceInfo: {
                             id: this.deviceId,
                             ip: this.currentIP,
-                            userAgent: navigator.userAgent
+                            userAgent: navigator.userAgent,
+                            platform: navigator.platform,
+                            deviceChanged: false // Default value, will update if needed
                         },
                         notes: [],
                         weekData: {
@@ -1671,14 +1674,10 @@
                     if (previousDeviceId) {
                         // If student has previously used a different device
                         if (previousDeviceId !== this.deviceId) {
-                            attendanceData.deviceChanged = true;
+                            attendanceData.deviceInfo.deviceChanged = true;
+                            attendanceData.deviceInfo.previousDeviceId = previousDeviceId;
                             attendanceData.notes.push(`Using different device than previous attendance`);
-                        } else {
-                            attendanceData.deviceChanged = false;
                         }
-                    } else {
-                        // First time recording attendance for this student
-                        attendanceData.deviceChanged = false;
                     }
 
                     // Check for same IP in existing attendees
@@ -2118,18 +2117,8 @@
             const form = document.getElementById('attendanceForm');
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
-                // Add animations to button before submitting
-                const submitBtn = document.getElementById('submitBtn');
-                submitBtn.classList.add('shake');
-                setTimeout(() => {
-                    submitBtn.classList.remove('shake');
-                    submitBtn.classList.add('nod');
-                    setTimeout(() => {
-                        submitBtn.classList.remove('nod');
-                        formApp.submitAttendance();
-                    }, 800);
-                }, 600);
+                // Submit directly without pre-animations
+                await formApp.submitAttendance();
             });
             
             // Check if student already submitted when ID field changes
