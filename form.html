@@ -1000,9 +1000,14 @@
                     document.getElementById('displaySubject').textContent = this.sessionData.subject;
                     document.getElementById('displayWeek').textContent = this.sessionData.week;
                     
-                    // Show password field if required
-                    if (this.sessionData.password) {
+                    // Check if this is the TA device by comparing IP
+                    const isTeacherDevice = this.currentIP === this.sessionData.taIP;
+                    
+                    // Show password field only if required AND not the TA device
+                    if (this.sessionData.password && !isTeacherDevice) {
                         document.getElementById('passwordGroup').classList.remove('hidden');
+                    } else {
+                        document.getElementById('passwordGroup').classList.add('hidden');
                     }
                     
                     // Hide loading and show form
@@ -1577,7 +1582,9 @@
                         isValid = false;
                     }
                     
-                    if (this.sessionData.password && !password) {
+                    // Only validate password if the password field is visible
+                    const passwordGroup = document.getElementById('passwordGroup');
+                    if (!passwordGroup.classList.contains('hidden') && this.sessionData.password && !password) {
                         this.showFieldError(passwordInput, 'Please enter the session password');
                         isValid = false;
                     }
@@ -1585,14 +1592,28 @@
                     if (!isValid) {
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
+                        
+                        // Add shake animation to the button
+                        submitBtn.classList.add('shake');
+                        setTimeout(() => {
+                            submitBtn.classList.remove('shake');
+                        }, 1200);
+                        
                         return;
                     }
 
-                    // Validate password if required
-                    if (this.sessionData.password && password !== this.sessionData.password) {
+                    // Validate password only if the password field is visible
+                    if (!passwordGroup.classList.contains('hidden') && this.sessionData.password && password !== this.sessionData.password) {
                         this.showFieldError(passwordInput, 'Incorrect session password');
+                        
+                        // Add shake animation to the button
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
+                        submitBtn.classList.add('shake');
+                        setTimeout(() => {
+                            submitBtn.classList.remove('shake');
+                        }, 1200);
+                        
                         return;
                     }
 
@@ -1600,8 +1621,15 @@
                     const student = this.sessionData.roster.find(s => s.id === studentId);
                     if (!student) {
                         this.showFieldError(studentIdInput, 'Student ID not found in roster');
+                        
+                        // Add shake animation to the button
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
+                        submitBtn.classList.add('shake');
+                        setTimeout(() => {
+                            submitBtn.classList.remove('shake');
+                        }, 1200);
+                        
                         return;
                     }
 
@@ -1609,8 +1637,15 @@
                     const existingAttendee = Object.values(this.sessionData.attendees || {}).find(a => a.id === studentId);
                     if (existingAttendee) {
                         this.showFieldError(studentIdInput, 'Attendance already recorded for this ID');
+                        
+                        // Add shake animation to the button
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Submit Attendance';
+                        submitBtn.classList.add('shake');
+                        setTimeout(() => {
+                            submitBtn.classList.remove('shake');
+                        }, 1200);
+                        
                         return;
                     }
 
@@ -1687,7 +1722,7 @@
                     
                     // Show success animation on inputs with proper timing
                     studentIdInput.classList.add('success-state');
-                    if (this.sessionData.password) {
+                    if (!passwordGroup.classList.contains('hidden')) {
                         passwordInput.classList.add('success-state');
                     }
                     
@@ -1798,22 +1833,44 @@
                     // Initialize speech recognition
                     if ('webkitSpeechRecognition' in window) {
                         this.recognition = new webkitSpeechRecognition();
+                        console.log('Using webkitSpeechRecognition');
                     } else if ('SpeechRecognition' in window) {
                         this.recognition = new SpeechRecognition();
+                        console.log('Using standard SpeechRecognition');
                     } else {
+                        console.error('Speech recognition not supported in this browser');
                         throw new Error('Speech recognition not supported');
                     }
                     
                     // Configure recognition
                     this.recognition.continuous = false;
                     this.recognition.interimResults = false;
-                    // Set language to Arabic with fallback options
-                    this.recognition.lang = 'ar-EG,ar-SA,ar';
+                    
+                    // Set language to Arabic with fallback options - try multiple configurations
+                    // Some browsers work better with just 'ar' while others need more specific dialects
+                    try {
+                        this.recognition.lang = 'ar';
+                        console.log('Set recognition language to: ar');
+                    } catch(e) {
+                        console.warn('Failed to set language to ar, trying ar-EG', e);
+                        try {
+                            this.recognition.lang = 'ar-EG';
+                        } catch(e2) {
+                            console.error('Failed to set recognition language', e2);
+                        }
+                    }
                     
                     // Handle recognition results
                     this.recognition.onresult = (event) => {
-                        const transcript = event.results[0][0].transcript;
-                        this.processVoiceInput(transcript);
+                        console.log('Speech recognition result received', event);
+                        try {
+                            const transcript = event.results[0][0].transcript;
+                            console.log('Recognition transcript:', transcript);
+                            this.processVoiceInput(transcript);
+                        } catch (error) {
+                            console.error('Error processing speech result:', error);
+                            this.showMessage('حدث خطأ في معالجة نتيجة التعرف الصوتي', 'danger');
+                        }
                     };
                     
                     // Handle errors
@@ -1822,10 +1879,32 @@
                         voiceBtn.classList.remove('listening');
                         voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
                         
+                        console.error('Speech recognition error:', event.error, event);
+                        
                         if (event.error === 'not-allowed') {
                             this.showMessage('الرجاء السماح بالوصول إلى الميكروفون في إعدادات المتصفح', 'danger');
                         } else if (event.error === 'no-speech') {
                             this.showMessage('لم يتم الكشف عن أي كلام. يرجى المحاولة مرة أخرى', 'warning');
+                        } else if (event.error === 'aborted') {
+                            this.showMessage('تم إلغاء التعرف الصوتي. يرجى المحاولة مرة أخرى', 'warning');
+                        } else if (event.error === 'audio-capture') {
+                            this.showMessage('لا يمكن الوصول إلى الميكروفون. يرجى التحقق من توصيل الميكروفون بشكل صحيح', 'danger');
+                        } else if (event.error === 'network') {
+                            this.showMessage('حدث خطأ في الشبكة. يرجى التحقق من اتصالك بالإنترنت', 'danger');
+                        } else if (event.error === 'bad-grammar') {
+                            this.showMessage('حدث خطأ في قواعد التعرف. يرجى المحاولة مرة أخرى', 'danger');
+                        } else if (event.error === 'language-not-supported') {
+                            this.showMessage('اللغة المحددة غير مدعومة. جاري تغيير اللغة...', 'warning');
+                            // Try fallback to English
+                            try {
+                                this.recognition.lang = 'en-US';
+                                console.log('Fallback to language: en-US');
+                                setTimeout(() => {
+                                    this.showMessage('يمكنك المحاولة مرة أخرى الآن', 'info');
+                                }, 1000);
+                            } catch(e) {
+                                console.error('Failed to set fallback language', e);
+                            }
                         } else {
                             this.showMessage('حدث خطأ في التعرف الصوتي، يرجى المحاولة مرة أخرى', 'danger');
                         }
@@ -1833,6 +1912,7 @@
                     
                     // Handle end of recognition
                     this.recognition.onend = () => {
+                        console.log('Speech recognition ended');
                         const voiceBtn = document.getElementById('voiceInputBtn');
                         voiceBtn.classList.remove('listening');
                         voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
@@ -1842,12 +1922,29 @@
                     const voiceBtn = document.getElementById('voiceInputBtn');
                     voiceBtn.addEventListener('click', () => {
                         try {
-                            // Start recognition
-                            this.recognition.start();
-                            voiceBtn.classList.add('listening');
-                            voiceBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
-                            this.showMessage('جاري الاستماع... انطق رقم الطالب المكون من 7 أرقام بالعربية أو أي لهجة', 'info');
+                            // Try to stop any existing recognition session first
+                            try {
+                                this.recognition.abort();
+                            } catch(e) {
+                                console.log('No active recognition to abort', e);
+                            }
+                            
+                            // Start recognition with a small delay
+                            setTimeout(() => {
+                                try {
+                                    this.recognition.start();
+                                    console.log('Speech recognition started');
+                                    voiceBtn.classList.add('listening');
+                                    voiceBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+                                    this.showMessage('جاري الاستماع... انطق رقم الطالب المكون من 7 أرقام بالعربية أو أي لهجة', 'info');
+                                } catch(startError) {
+                                    console.error('Speech recognition start error after delay:', startError);
+                                    this.showMessage('تعذر بدء التعرف الصوتي. يرجى تحديث الصفحة والمحاولة مرة أخرى', 'danger');
+                                    voiceBtn.classList.remove('listening');
+                                }
+                            }, 100);
                         } catch (error) {
+                            console.error('Speech recognition start error:', error);
                             this.showMessage('تعذر بدء التعرف الصوتي. يرجى تحديث الصفحة والمحاولة مرة أخرى', 'danger');
                             voiceBtn.classList.remove('listening');
                         }
@@ -1861,11 +1958,13 @@
                     voiceGroup.appendChild(tooltip);
                     
                 } catch (error) {
+                    console.error('Voice recognition initialization error:', error);
                     // Hide voice button if not supported
                     const voiceBtn = document.getElementById('voiceInputBtn');
                     if (voiceBtn) {
                         voiceBtn.style.display = 'none';
                     }
+                    this.showMessage('التعرف الصوتي غير مدعوم في هذا المتصفح', 'warning');
                 }
             },
             
@@ -2019,7 +2118,35 @@
             const form = document.getElementById('attendanceForm');
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                await formApp.submitAttendance();
+                
+                // Add animations to button before submitting
+                const submitBtn = document.getElementById('submitBtn');
+                submitBtn.classList.add('shake');
+                setTimeout(() => {
+                    submitBtn.classList.remove('shake');
+                    submitBtn.classList.add('nod');
+                    setTimeout(() => {
+                        submitBtn.classList.remove('nod');
+                        formApp.submitAttendance();
+                    }, 800);
+                }, 600);
+            });
+            
+            // Check if student already submitted when ID field changes
+            const studentIdInput = document.getElementById('student_id');
+            studentIdInput.addEventListener('blur', function() {
+                const studentId = studentIdInput.value.trim();
+                if (studentId && formApp.sessionData && formApp.sessionData.attendees) {
+                    const existingAttendee = Object.values(formApp.sessionData.attendees || {}).find(a => a.id === studentId);
+                    if (existingAttendee) {
+                        formApp.showFieldError(studentIdInput, 'Attendance already recorded for this ID');
+                        // Disable submit button
+                        document.getElementById('submitBtn').disabled = true;
+                    } else {
+                        // Re-enable submit button if no other errors
+                        document.getElementById('submitBtn').disabled = false;
+                    }
+                }
             });
             
             // Clean up when page is closed
