@@ -2777,6 +2777,7 @@
                     // Create device ID tracking map
                     const deviceIdMap = {};
                     const deviceHistory = {};
+                    const deviceNotes = {};
                     
                     // First, build a history of device IDs for each student
                     attendees.forEach(a => {
@@ -2788,14 +2789,29 @@
                             if (!deviceHistory[a.id].includes(a.deviceInfo.id)) {
                                 deviceHistory[a.id].push(a.deviceInfo.id);
                             }
+                            
+                            // Check if this attendance record has device change info
+                            if (a.deviceInfo.deviceChanged) {
+                                deviceIdMap[a.id] = 'Yes';
+                                if (a.deviceInfo.previousDeviceId) {
+                                    deviceNotes[a.id] = `Changed from device ID: ${a.deviceInfo.previousDeviceId.substring(0, 8)}...`;
+                                } else {
+                                    deviceNotes[a.id] = 'Device changed from previous attendance';
+                                }
+                            }
                         }
                     });
                     
-                    // Then determine if device was changed
+                    // Then determine if device was changed for any remaining students
                     attendees.forEach(a => {
-                        if (a.id) {
+                        if (a.id && !deviceIdMap[a.id]) {
                             // Device changed if student has multiple device IDs
-                            deviceIdMap[a.id] = deviceHistory[a.id]?.length > 1 ? 'Yes' : 'No';
+                            if (deviceHistory[a.id]?.length > 1) {
+                                deviceIdMap[a.id] = 'Yes';
+                                deviceNotes[a.id] = `Used ${deviceHistory[a.id].length} different devices`;
+                            } else {
+                                deviceIdMap[a.id] = 'No';
+                            }
                         }
                     });
 
@@ -2828,10 +2844,22 @@
 
                         // Add device changed status
                             row['Device Changed'] = deviceIdMap[student.id] || 'No';
+                            
+                            // Add device note if applicable
+                            const deviceNote = deviceNotes[student.id] || '';
 
                         // Add IP note if applicable
                             const ipNote = ipNotes[student.id] || '';
-                            row['Note'] = ipNote;
+                            
+                            // Combine notes
+                            let notes = [];
+                            if (deviceNote) notes.push(deviceNote);
+                            if (ipNote) notes.push(ipNote);
+                            if (matched && matched.notes && matched.notes.length > 0) {
+                                notes = notes.concat(matched.notes);
+                            }
+                            
+                            row['Notes'] = notes.join('; ');
                             
                             reportData.push(row);
                     });
@@ -2849,9 +2877,21 @@
                                 'Device Changed': deviceIdMap[student.id] || 'No'
                         };
 
+                        // Add device note if applicable
+                        const deviceNote = deviceNotes[student.id] || '';
+
                         // Add IP note if applicable
-                            const ipNote = ipNotes[student.id] || '';
-                            row['Note'] = ipNote;
+                        const ipNote = ipNotes[student.id] || '';
+                        
+                        // Combine notes
+                        let notes = [];
+                        if (deviceNote) notes.push(deviceNote);
+                        if (ipNote) notes.push(ipNote);
+                        if (matched && matched.notes && matched.notes.length > 0) {
+                            notes = notes.concat(matched.notes);
+                        }
+                        
+                        row['Notes'] = notes.join('; ');
                             
                             reportData.push(row);
                         });
@@ -2860,6 +2900,17 @@
                     // Add flagged submissions at the end
                     attendees.filter(a => a.notes?.length > 0).forEach(flagged => {
                         if (!reportData.some(r => r['Student ID'] === flagged.id)) {
+                            const deviceNote = deviceNotes[flagged.id] || '';
+                            const ipNote = ipNotes[flagged.id] || '';
+                            
+                            // Combine notes
+                            let notes = [];
+                            if (deviceNote) notes.push(deviceNote);
+                            if (ipNote) notes.push(ipNote);
+                            if (flagged.notes && flagged.notes.length > 0) {
+                                notes = notes.concat(flagged.notes);
+                            }
+                            
                             reportData.push({
                                 'Student ID': flagged.id,
                                 'Name': flagged.name || 'Flagged Submission',
@@ -2867,8 +2918,8 @@
                                 [`Week ${currentWeek}`]: 0,
                                 'Total Attendance': 0,
                                 [`Timestamp Week ${currentWeek}`]: new Date(flagged.timestamp).toLocaleString(),
-                                'Device Changed': flagged.deviceChanged ? 'Yes' : 'No',
-                                'Note': flagged.notes.join('; ')
+                                'Device Changed': flagged.deviceInfo?.deviceChanged ? 'Yes' : deviceIdMap[flagged.id] || 'No',
+                                'Notes': notes.join('; ')
                             });
                         }
                     });
@@ -2888,8 +2939,8 @@
                     columnOrder.push(`Timestamp Week ${week}`);
                 });
 
-                // Add Note column 
-                columnOrder.push('Note');
+                // Add Notes column 
+                columnOrder.push('Notes');
                 
                 const reorderedData = reportData.map(row => {
                     const newRow = {};
